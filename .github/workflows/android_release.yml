@@ -41,8 +41,9 @@ jobs:
     - name: Build APK
       run: |
         chmod +x build.sh
-        # Create a dummy keystore for CI if secrets aren't set
+        # Force create a fresh debug keystore for CI
         mkdir -p $HOME/.android
+        rm -f $HOME/.android/debug.keystore
         keytool -genkey -v -keystore $HOME/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "cn=Android Debug, ou=Unknown, o=Unknown, c=US"
         ./build.sh
 

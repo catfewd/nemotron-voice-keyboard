@@ -1,4 +1,4 @@
-package dev.notune.transcribe;
+package com.catfewd.nemotron;
 
 import android.app.Activity;
 import android.content.Context;

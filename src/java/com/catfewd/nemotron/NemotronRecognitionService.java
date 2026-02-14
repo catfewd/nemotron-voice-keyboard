@@ -1,4 +1,4 @@
-package dev.notune.transcribe;
+package com.catfewd.nemotron;
 
 import android.content.Intent;
 import android.speech.RecognitionService;

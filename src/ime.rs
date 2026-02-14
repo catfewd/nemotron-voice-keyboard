@@ -23,7 +23,7 @@ struct ImeState {
 static IME_STATE: Lazy<Mutex<Option<ImeState>>> = Lazy::new(|| Mutex::new(None));
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_dev_notune_transcribe_RustInputMethodService_initNative(
+pub unsafe extern "system" fn Java_com_catfewd_nemotron_RustInputMethodService_initNative(
     env: JNIEnv,
     _class: JClass,
     service: JObject,
@@ -124,7 +124,7 @@ fn notify_status(env: &mut JNIEnv, obj: &JObject, msg: &str) {
 }
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_dev_notune_transcribe_RustInputMethodService_cleanupNative(
+pub unsafe extern "system" fn Java_com_catfewd_nemotron_RustInputMethodService_cleanupNative(
     _env: JNIEnv,
     _class: JClass,
 ) {
@@ -132,7 +132,7 @@ pub unsafe extern "system" fn Java_dev_notune_transcribe_RustInputMethodService_
 }
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_dev_notune_transcribe_RustInputMethodService_startRecording(
+pub unsafe extern "system" fn Java_com_catfewd_nemotron_RustInputMethodService_startRecording(
     mut env: JNIEnv,
     _class: JClass,
 ) {
@@ -245,7 +245,7 @@ pub unsafe extern "system" fn Java_dev_notune_transcribe_RustInputMethodService_
 }
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_dev_notune_transcribe_RustInputMethodService_stopRecording(
+pub unsafe extern "system" fn Java_com_catfewd_nemotron_RustInputMethodService_stopRecording(
     mut env: JNIEnv,
     _class: JClass,
 ) {

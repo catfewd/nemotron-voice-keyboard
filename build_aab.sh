@@ -195,7 +195,7 @@ echo "--- Creating Asset Module ---"
 cat > build_aab/model_assets_manifest.xml <<EOF
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:dist="http://schemas.android.com/apk/distribution"
-    package="dev.notune.transcribe"
+    package="com.catfewd.nemotron"
     split="model_assets">
     <dist:module dist:type="asset-pack">
         <dist:fusing dist:include="true" />

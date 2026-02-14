@@ -5,7 +5,7 @@ use parakeet_rs::{ExecutionConfig as OrtExecutionConfig, Nemotron};
 use std::sync::Arc;
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_dev_notune_transcribe_MainActivity_initNative(
+pub unsafe extern "system" fn Java_com_catfewd_nemotron_MainActivity_initNative(
     env: JNIEnv,
     _class: JClass,
     activity: JObject,

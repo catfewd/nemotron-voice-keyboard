@@ -1,4 +1,4 @@
-package dev.notune.transcribe;
+package com.catfewd.nemotron;
 
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -30,8 +30,8 @@ import android.widget.LinearLayout;
 
 public class LiveSubtitleService extends Service {
     private static final String TAG = "LiveSubtitleService";
-    public static final String ACTION_START = "dev.notune.transcribe.START_SUBTITLES";
-    public static final String ACTION_STOP = "dev.notune.transcribe.STOP_SUBTITLES";
+    public static final String ACTION_START = "com.catfewd.nemotron.START_SUBTITLES";
+    public static final String ACTION_STOP = "com.catfewd.nemotron.STOP_SUBTITLES";
     private static final String CHANNEL_ID = "LiveSubtitlesChannel";
     private static final int NOTIFICATION_ID = 12345;
 

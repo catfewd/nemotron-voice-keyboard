@@ -70,7 +70,15 @@ $D8 --output build_manual/apk \
 echo "--- Packaging ---"
 cp target/aarch64-linux-android/release/libandroid_transcribe_app.so build_manual/lib/arm64-v8a/
 cp jniLibs/arm64-v8a/libonnxruntime.so build_manual/lib/arm64-v8a/
-cp /data/data/com.termux/files/usr/lib/libc++_shared.so build_manual/lib/arm64-v8a/
+
+if [ "$GITHUB_ACTIONS" = "true" ]; then
+    # In CI, find it in the NDK
+    CPPLIB=$(find $ANDROID_NDK_HOME -name "libc++_shared.so" | grep "aarch64" | head -n 1)
+    cp "$CPPLIB" build_manual/lib/arm64-v8a/
+else
+    # In Termux
+    cp /data/data/com.termux/files/usr/lib/libc++_shared.so build_manual/lib/arm64-v8a/
+fi
 
 cd build_manual/apk
 zip -g unaligned.apk classes.dex

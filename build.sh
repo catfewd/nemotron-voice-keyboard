@@ -2,12 +2,21 @@
 set -e
 
 # --- Configuration ---
-# Use system tools in Termux
-AAPT2=$(which aapt2)
-D8=$(which d8)
-APKSIGNER=$(which apksigner)
-ZIPALIGN=$(which zipalign)
-PLATFORM="/data/data/com.termux/files/home/android-sdk/platforms/android-33/android.jar"
+if [ "$GITHUB_ACTIONS" = "true" ]; then
+    # GitHub Actions environment
+    AAPT2=$(find $ANDROID_HOME/build-tools -name aapt2 | sort -r | head -n 1)
+    D8=$(find $ANDROID_HOME/build-tools -name d8 | sort -r | head -n 1)
+    APKSIGNER=$(find $ANDROID_HOME/build-tools -name apksigner | sort -r | head -n 1)
+    ZIPALIGN=$(find $ANDROID_HOME/build-tools -name zipalign | sort -r | head -n 1)
+    PLATFORM=$(find $ANDROID_HOME/platforms -name android.jar | sort -r | head -n 1)
+else
+    # Local Termux environment
+    AAPT2=$(which aapt2)
+    D8=$(which d8)
+    APKSIGNER=$(which apksigner)
+    ZIPALIGN=$(which zipalign)
+    PLATFORM="/data/data/com.termux/files/home/android-sdk/platforms/android-33/android.jar"
+fi
 
 # Keystore
 KEYSTORE="$HOME/.android/debug.keystore"
@@ -62,7 +71,7 @@ cp -r ../lib .
 zip -r0 unaligned.apk lib
 if [ -d "../../assets" ]; then
     cp -r ../../assets .
-    zip -r -g unaligned.apk assets
+    zip -r0 -g unaligned.apk assets
 fi
 cd ../..
 

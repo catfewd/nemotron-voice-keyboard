@@ -226,6 +226,15 @@
                 android:layout_marginBottom="16dp"/>
 
             <Button
+                android:id="@+id/credit_catfewd"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/credit_catfewd"
+                style="@style/ButtonStyle"
+                android:backgroundTint="#FF4081"
+                android:layout_marginBottom="8dp"/>
+
+            <Button
                 android:id="@+id/credit_no_tune"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

@@ -91,11 +91,13 @@ public class MainActivity extends Activity implements View.OnClickListener, andr
 
                 startSubsButton.setOnClickListener(this);
 
-                imeSettingsButton.setOnClickListener(this);
+                        imeSettingsButton.setOnClickListener(this);
 
-                
+                        
 
-                findViewById(R.id.credit_no_tune).setOnClickListener(this);
+                        findViewById(R.id.credit_catfewd).setOnClickListener(this);
+
+                        findViewById(R.id.credit_no_tune).setOnClickListener(this);
 
                 findViewById(R.id.credit_lokkju).setOnClickListener(this);
 
@@ -145,15 +147,19 @@ public class MainActivity extends Activity implements View.OnClickListener, andr
 
             startActivity(new Intent(this, LiveSubtitleActivity.class));
 
-                } else if (id == R.id.btn_ime_settings) {
+                        } else if (id == R.id.btn_ime_settings) {
 
-                    startActivity(new Intent(Settings.ACTION_INPUT_METHOD_SETTINGS));
+                            startActivity(new Intent(Settings.ACTION_INPUT_METHOD_SETTINGS));
 
-                } else if (id == R.id.text_welcome_subtitle) {
+                        } else if (id == R.id.text_welcome_subtitle) {
 
-                    openUrl("https://huggingface.co/lokkju/nemotron-speech-streaming-en-0.6b-int8");
+                            openUrl("https://huggingface.co/lokkju/nemotron-speech-streaming-en-0.6b-int8");
 
-                } else if (id == R.id.credit_no_tune) {
+                        } else if (id == R.id.credit_catfewd) {
+
+                            openUrl("https://github.com/catfewd/nemotron-voice-keyboard");
+
+                        } else if (id == R.id.credit_no_tune) {
 
                     openUrl("https://github.com/no-tune/parakeet-rs");
 

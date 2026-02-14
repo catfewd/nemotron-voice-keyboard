@@ -30,6 +30,15 @@ jobs:
       with:
         targets: aarch64-linux-android
 
+    - name: Install Android NDK r28
+      run: |
+        cd $ANDROID_HOME
+        curl -L -O https://dl.google.com/android/repository/android-ndk-r28-linux.zip
+        unzip -q android-ndk-r28-linux.zip
+        rm android-ndk-r28-linux.zip
+        echo "ANDROID_NDK_HOME=$ANDROID_HOME/android-ndk-r28" >> $GITHUB_ENV
+        echo "$ANDROID_HOME/android-ndk-r28/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
+
     - name: Download Nemotron Model
       run: |
         mkdir -p assets/nemotron-model

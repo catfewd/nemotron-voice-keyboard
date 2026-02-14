@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@color/ime_background"
+    android:padding="8dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingBottom="8dp">
+
+        <TextView
+            android:id="@+id/ime_status_text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Tap to speak"
+            android:textColor="@color/ime_text_primary"
+            android:textSize="14sp"
+            android:paddingStart="8dp"/>
+            
+        <ProgressBar
+            android:id="@+id/ime_progress"
+            style="?android:attr/progressBarStyleSmall"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:visibility="gone"/>
+    </LinearLayout>
+
+    <FrameLayout
+        android:id="@+id/ime_record_container"
+        android:layout_width="match_parent"
+        android:layout_height="200dp"
+        android:background="@drawable/bg_card"
+        android:backgroundTint="@color/ime_card_bg">
+        
+        <ImageView
+            android:id="@+id/ime_mic_icon"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:src="@android:drawable/ic_btn_speak_now"
+            android:layout_gravity="center"
+            android:tint="@color/colorPrimary"/>
+
+        <ScrollView
+            android:id="@+id/ime_preview_scroll"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true"
+            android:visibility="gone">
+            <TextView
+                android:id="@+id/ime_preview_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="16dp"
+                android:text=""
+                android:textColor="@color/ime_text_primary"
+                android:textSize="16sp"
+                android:gravity="center"/>
+        </ScrollView>
+            
+        <TextView
+            android:id="@+id/ime_hint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Tap to Record"
+            android:layout_gravity="center_horizontal|bottom"
+            android:layout_marginBottom="24dp"
+            android:textColor="@color/ime_text_secondary"/>
+    </FrameLayout>
+
+</LinearLayout>

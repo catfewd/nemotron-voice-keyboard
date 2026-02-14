@@ -1,0 +1,22 @@
+# Build artifacts
+target/
+build_manual/
+*.apk
+*.idsig
+
+# Models (too large for Git)
+assets/nemotron-model/encoder.onnx
+assets/nemotron-model/decoder_joint.onnx
+assets/nemotron-model/tokenizer.model
+
+# Backups and references
+backups/
+futo_ref_dir/
+transcribro_dir/
+temp_ref_dir/
+futo_ref_dir/
+*.tar.gz
+
+# Termux/OS files
+.gemini/
+.DS_Store

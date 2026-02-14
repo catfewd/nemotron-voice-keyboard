@@ -9,6 +9,9 @@ if [ "$GITHUB_ACTIONS" = "true" ]; then
     APKSIGNER=$(find $ANDROID_HOME/build-tools -name apksigner | sort -r | head -n 1)
     ZIPALIGN=$(find $ANDROID_HOME/build-tools -name zipalign | sort -r | head -n 1)
     PLATFORM=$(find $ANDROID_HOME/platforms -name android.jar | sort -r | head -n 1)
+    
+    export ORT_LIB_LOCATION="$GITHUB_WORKSPACE/libs/onnxruntime/jni/arm64-v8a"
+    export ORT_INCLUDE_DIR="$GITHUB_WORKSPACE/libs/onnxruntime/headers"
 else
     # Local Termux environment
     AAPT2=$(which aapt2)
@@ -16,6 +19,10 @@ else
     APKSIGNER=$(which apksigner)
     ZIPALIGN=$(which zipalign)
     PLATFORM="/data/data/com.termux/files/home/android-sdk/platforms/android-33/android.jar"
+    
+    export RUSTFLAGS="-L /data/data/com.termux/files/usr/lib -L $(pwd)/fake_libs"
+    export ORT_LIB_LOCATION="$(pwd)/libs/onnxruntime/jni/arm64-v8a"
+    export ORT_INCLUDE_DIR="$(pwd)/libs/onnxruntime/headers"
 fi
 
 # Keystore

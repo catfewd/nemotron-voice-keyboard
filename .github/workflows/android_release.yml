@@ -50,6 +50,14 @@ jobs:
     - name: Build APK
       run: |
         chmod +x build.sh
+        # Set NDK tool paths explicitly for Rust/Cargo
+        export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
+        export CC=$TOOLCHAIN/bin/aarch64-linux-android33-clang
+        export CXX=$TOOLCHAIN/bin/aarch64-linux-android33-clang++
+        export AR=$TOOLCHAIN/bin/llvm-ar
+        export LD=$TOOLCHAIN/bin/ld
+        export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$CC
+        
         # Force create a fresh debug keystore for CI
         mkdir -p $HOME/.android
         rm -f $HOME/.android/debug.keystore

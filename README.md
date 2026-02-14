@@ -31,7 +31,7 @@ This project is built with anonymity and privacy as its core values. To protect 
 
 Download the latest version from the [Releases](https://github.com/catfewd/nemotron-voice-keyboard/releases) page.
 
-1. Install the APK.
+1. Install the `Nemotron_Voice_Keyboard.apk`.
 2. Follow the in-app instructions to enable the Nemotron Keyboard.
 3. (Optional) Set Nemotron as your system-wide Voice Input app in: System Settings > Language & region > Speech > Voice input.
 

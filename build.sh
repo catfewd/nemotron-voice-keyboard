@@ -73,7 +73,7 @@ $APKSIGNER sign --ks "$KEYSTORE" \
     --ks-pass "pass:$STORE_PASS" \
     --key-pass "pass:$KEY_PASS" \
     --ks-key-alias "$KEY_ALIAS" \
-    --out android_transcribe_app_release.apk \
+    --out Nemotron_Voice_Keyboard.apk \
     build_manual/apk/aligned.apk
 
-echo "SUCCESS: android_transcribe_app_release.apk created"
+echo "SUCCESS: Nemotron_Voice_Keyboard.apk created"

@@ -9,7 +9,7 @@ This project provides a seamless voice typing experience for Android users who v
 ## Features
 
 - Real-time streaming transcription.
-- Automatic keyboard switching: Reverts to your previous keyboard (e.g., FUTO) immediately after you finish speaking.
+- Automatic keyboard switching: Reverts to your previous keyboard immediately after you finish speaking.
 - System-wide integration: Registered as a standard Android Voice Input provider.
 - Forced Dark Mode support for high-visibility environments.
 - Live Subtitles: Capture and caption any audio playing on your device in real-time.
@@ -18,23 +18,26 @@ This project provides a seamless voice typing experience for Android users who v
 
 I am catfewd. I am not a programmer, and I do not have a background in software development. This project was made possible only through the incredible work of the following individuals and teams:
 
-- **NoTune**: The creator of parakeet-rs and the original offline voice input application architecture. This project is built directly upon those foundations.
+- **NoTune**: The creator of Parakeet RS and the original offline voice input application architecture.
 - **lokkju**: Responsible for the quantization of the Nemotron-3 0.6B model into the INT8 format used here.
 - **Microsoft / pykeio**: The developers of the ONNX Runtime (ort) Rust bindings.
 - **Rust Audio Team**: The developers of CPAL, used for cross-platform audio handling.
 
+## Privacy First
+
+This project is built with anonymity and privacy as its core values. To protect the developer's identity and maintain the integrity of this "Privacy First" mission, no donations or payments are currently being accepted. The best way to support the project is to use it, share it, and contribute to the code.
+
 ## Installation
 
-Currently, the project is distributed as an APK for manual installation.
+Download the latest version from the [Releases](https://github.com/catfewd/nemotron-voice-keyboard/releases) page.
 
-1. Download the latest `android_transcribe_app_release.apk`.
-2. Enable "Install from Unknown Sources" in your Android settings.
-3. Install the APK and follow the in-app instructions to enable the Nemotron Keyboard.
-4. (Optional) Set Nemotron as your system-wide Voice Input app in: System Settings > Language & region > Speech > Voice input.
+1. Install the APK.
+2. Follow the in-app instructions to enable the Nemotron Keyboard.
+3. (Optional) Set Nemotron as your system-wide Voice Input app in: System Settings > Language & region > Speech > Voice input.
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details. Note that the underlying Nemotron model and various libraries used carry their own respective licenses.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ---
 Keywords: NVIDIA Nemotron, Android Voice Keyboard, Offline ASR, On-device Speech to Text, Private Dictation, Nemotron-3 0.6B, INT8 Quantization, Rust Android App.

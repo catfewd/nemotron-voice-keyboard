@@ -37,7 +37,11 @@ jobs:
         unzip -q android-ndk-r28-linux.zip
         rm android-ndk-r28-linux.zip
         echo "ANDROID_NDK_HOME=$ANDROID_HOME/android-ndk-r28" >> $GITHUB_ENV
-        echo "$ANDROID_HOME/android-ndk-r28/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
+        TOOLCHAIN_BIN=$ANDROID_HOME/android-ndk-r28/toolchains/llvm/prebuilt/linux-x86_64/bin
+        echo "$TOOLCHAIN_BIN" >> $GITHUB_PATH
+        # Create symlinks for generic names that many crates expect
+        ln -s $TOOLCHAIN_BIN/aarch64-linux-android33-clang $TOOLCHAIN_BIN/aarch64-linux-android-clang
+        ln -s $TOOLCHAIN_BIN/aarch64-linux-android33-clang++ $TOOLCHAIN_BIN/aarch64-linux-android-clang++
 
     - name: Download Nemotron Model
       run: |
@@ -50,6 +54,11 @@ jobs:
     - name: Build APK
       run: |
         chmod +x build.sh
+        # Clear any environment variables that might contain Termux paths
+        unset RUSTFLAGS
+        unset ORT_LIB_LOCATION
+        unset ORT_INCLUDE_DIR
+        
         # Set NDK tool paths explicitly for Rust/Cargo
         export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
         export CC=$TOOLCHAIN/bin/aarch64-linux-android33-clang

@@ -18,7 +18,8 @@ This project provides a seamless voice typing experience for Android users who v
 
 I am catfewd. I am not a programmer, and I do not have a background in software development. This project was made possible only through the incredible work of the following individuals and teams:
 
-- **NoTune**: The creator of [Parakeet RS](https://github.com/no-tune/parakeet-rs) and the original [offline voice input application](https://github.com/no-tune/offline-voice-input) architecture.
+- **altunenes**: The creator of [parakeet-rs](https://github.com/altunenes/parakeet-rs).
+- **Notune**: The creator of the [android_transcribe_app](https://github.com/notune/android_transcribe_app) (the original architecture).
 - **lokkju**: Responsible for the [quantization](https://huggingface.co/lokkju/nemotron-speech-streaming-en-0.6b-int8) of the Nemotron-3 0.6B model into the INT8 format used here.
 - **Microsoft / pykeio**: The developers of the [ONNX Runtime (ort)](https://github.com/pykeio/ort) Rust bindings.
 - **Rust Audio Team**: The developers of [CPAL](https://github.com/RustAudio/cpal), used for cross-platform audio handling.

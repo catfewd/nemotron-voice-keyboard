@@ -30,7 +30,8 @@
     <string name="section_credits">Special Thanks</string>
     <string name="desc_credits">This project is built upon the incredible open-source work of the following developers:</string>
     <string name="credit_catfewd">Maintainer: catfewd</string>
-    <string name="credit_no_tune">Parakeet RS &amp; Original App: NoTune</string>
+    <string name="credit_altunenes">Inference Engine: altunenes</string>
+    <string name="credit_notune">Original App: Notune</string>
     <string name="credit_lokkju">Nemotron Quantization: lokkju</string>
     <string name="credit_ort">ONNX Runtime: Microsoft/pykeio</string>
     <string name="credit_cpal">CPAL: Rust Audio team</string>

@@ -97,7 +97,9 @@ public class MainActivity extends Activity implements View.OnClickListener, andr
 
                         findViewById(R.id.credit_catfewd).setOnClickListener(this);
 
-                        findViewById(R.id.credit_no_tune).setOnClickListener(this);
+                        findViewById(R.id.credit_altunenes).setOnClickListener(this);
+
+                        findViewById(R.id.credit_notune).setOnClickListener(this);
 
                 findViewById(R.id.credit_lokkju).setOnClickListener(this);
 
@@ -159,11 +161,15 @@ public class MainActivity extends Activity implements View.OnClickListener, andr
 
                             openUrl("https://github.com/catfewd/nemotron-voice-keyboard");
 
-                        } else if (id == R.id.credit_no_tune) {
+                        } else if (id == R.id.credit_altunenes) {
 
-                    openUrl("https://github.com/no-tune/parakeet-rs");
+                            openUrl("https://github.com/altunenes/parakeet-rs");
 
-                } else if (id == R.id.credit_lokkju) {
+                        } else if (id == R.id.credit_notune) {
+
+                            openUrl("https://github.com/notune/android_transcribe_app");
+
+                        } else if (id == R.id.credit_lokkju) {
 
             openUrl("https://huggingface.co/lokkju/nemotron-speech-streaming-en-0.6b-int8");
 

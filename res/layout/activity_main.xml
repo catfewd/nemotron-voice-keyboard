@@ -235,10 +235,19 @@
                 android:layout_marginBottom="8dp"/>
 
             <Button
-                android:id="@+id/credit_no_tune"
+                android:id="@+id/credit_altunenes"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/credit_no_tune"
+                android:text="@string/credit_altunenes"
+                style="@style/ButtonStyle"
+                android:backgroundTint="#607D8B"
+                android:layout_marginBottom="8dp"/>
+
+            <Button
+                android:id="@+id/credit_notune"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/credit_notune"
                 style="@style/ButtonStyle"
                 android:backgroundTint="#607D8B"
                 android:layout_marginBottom="8dp"/>

@@ -44,13 +44,10 @@ pub unsafe extern "system" fn Java_com_catfewd_nemotron_RustInputMethodService_i
         is_streaming: Arc::new(std::sync::atomic::AtomicBool::new(false)),
     });
 
-    // Trigger lazy loading of engine if needed, but for IME we usually wait for main app.
-    // However, if IME starts first (possible), we must ensure model is there.
     let vm_clone = vm_arc.clone();
     let service_ref_clone = service_ref.clone();
 
     std::thread::spawn(move || {
-        // 1. Check if already loaded
         if engine::is_engine_loaded() {
             if let Ok(mut env) = vm_clone.attach_current_thread() {
                 notify_status(&mut env, service_ref_clone.as_obj(), "Ready");
@@ -58,24 +55,53 @@ pub unsafe extern "system" fn Java_com_catfewd_nemotron_RustInputMethodService_i
             return;
         }
 
-        // 2. Attempt to claim loading rights
         if let Some(_guard) = engine::LoadingGuard::new() {
-            // We are the loader
             if let Ok(mut env) = vm_clone.attach_current_thread() {
                 let srv = service_ref_clone.as_obj();
-                
-                notify_status(&mut env, srv, "Checking assets...");
-                match assets::extract_assets(&mut env, srv) {
-                    Ok(path) => {
-                        notify_status(&mut env, srv, "Loading model (880MB)...");
-                        log::info!("IME starting model load");
+                notify_status(&mut env, srv, "Loading model (Memory Mapped)...");
 
-                        let exec_cfg = OrtExecutionConfig::new()
-                            .with_intra_threads(2)
-                            .with_inter_threads(1);
-                        match Nemotron::from_pretrained(&path, Some(exec_cfg)) {
+                match assets::get_mapped_assets(&mut env, srv) {
+                    Ok(mapped) => {
+                        let exec_cfg = OrtExecutionConfig::default();
+                        
+                        let application_info_obj = env.call_method(srv, "getApplicationInfo", "()Landroid/content/pm/ApplicationInfo;", &[]).unwrap().l().unwrap();
+                        let source_dir_j = env.get_field(&application_info_obj, "sourceDir", "Ljava/lang/String;").unwrap().l().unwrap();
+                        let apk_path: String = env.get_string(&source_dir_j.into()).unwrap().into();
+
+                        let encoder_bytes = assets::get_asset_slice(&mapped.encoder, "assets/nemotron-model/encoder.onnx", &apk_path).unwrap();
+                        let decoder_bytes = assets::get_asset_slice(&mapped.decoder, "assets/nemotron-model/decoder_joint.onnx", &apk_path).unwrap();
+
+                        let chunk_size = {
+                            let mut chunk_val = None;
+                            let settings_str = env.new_string("settings").unwrap();
+                            if let Ok(prefs) = env.call_method(
+                                srv,
+                                "getSharedPreferences",
+                                "(Ljava/lang/String;I)Landroid/content/SharedPreferences;",
+                                &[(&settings_str).into(), 0.into()],
+                            ) {
+                                let key_str = env.new_string("chunk_size").unwrap();
+                                if let Ok(val) = env.call_method(
+                                    prefs.l().unwrap(),
+                                    "getInt",
+                                    "(Ljava/lang/String;I)I",
+                                    &[(&key_str).into(), 56.into()],
+                                ) {
+                                    chunk_val = Some(val.i().unwrap() as usize);
+                                }
+                            }
+                            chunk_val
+                        };
+
+                        match Nemotron::from_memory(
+                            encoder_bytes,
+                            decoder_bytes,
+                            &mapped.tokenizer,
+                            Some(exec_cfg),
+                            chunk_size,
+                        ) {
                             Ok(eng) => {
-                                log::info!("IME loaded model successfully");
+                                log::info!("IME loaded model successfully from memory map");
                                 engine::set_engine(eng);
                                 notify_status(&mut env, srv, "Ready");
                             }
@@ -86,26 +112,20 @@ pub unsafe extern "system" fn Java_com_catfewd_nemotron_RustInputMethodService_i
                         }
                     }
                     Err(e) => {
-                        log::error!("IME asset extraction failed: {}", e);
+                        log::error!("Asset mapping failed: {}", e);
                         notify_status(&mut env, srv, &format!("Error: {}", e));
                     }
                 }
             }
-            // _guard drops here
         } else {
-             // 3. Someone else is loading.
              if let Ok(mut env) = vm_clone.attach_current_thread() {
                 let srv = service_ref_clone.as_obj();
                 notify_status(&mut env, srv, "Waiting for model...");
-                
                 while engine::is_loading() {
                     std::thread::sleep(std::time::Duration::from_millis(500));
                 }
-                
                 if engine::is_engine_loaded() {
                     notify_status(&mut env, srv, "Ready");
-                } else {
-                    notify_status(&mut env, srv, "Model failed in other thread");
                 }
              }
         }
@@ -158,7 +178,6 @@ pub unsafe extern "system" fn Java_com_catfewd_nemotron_RustInputMethodService_s
         let jvm_clone = state.jvm.clone();
         let service_ref_clone = state.service_ref.clone();
 
-        // Spawn a worker thread to pump chunks to the engine
         std::thread::spawn(move || {
             let mut env = jvm_clone.attach_current_thread().unwrap();
             let service_obj = service_ref_clone.as_obj();
@@ -168,20 +187,25 @@ pub unsafe extern "system" fn Java_com_catfewd_nemotron_RustInputMethodService_s
                 None => return,
             };
 
+            let mut chunk_size = 8960;
+            {
+                if let Ok(eng) = engine_arc.lock() {
+                    chunk_size = eng.get_chunk_size() * 160;
+                }
+            }
+
             {
                 let mut eng = engine_arc.lock().unwrap();
                 let _ = eng.reset();
             }
-
-            const CHUNK_SIZE: usize = 8960; // 560ms
 
             while is_streaming_clone.load(std::sync::atomic::Ordering::Acquire) {
                 let mut chunk_to_process = None;
                 
                 {
                     let mut shared_buffer = buffer_clone.lock().unwrap();
-                    if shared_buffer.len() >= CHUNK_SIZE {
-                        chunk_to_process = Some(shared_buffer.drain(0..CHUNK_SIZE).collect::<Vec<f32>>());
+                    if shared_buffer.len() >= chunk_size {
+                        chunk_to_process = Some(shared_buffer.drain(0..chunk_size).collect::<Vec<f32>>());
                     }
                 }
 
@@ -205,7 +229,6 @@ pub unsafe extern "system" fn Java_com_catfewd_nemotron_RustInputMethodService_s
                 }
             }
 
-            // Send final result when streaming stops
             let engine_arc = match engine::get_engine() {
                 Some(e) => e,
                 None => return,

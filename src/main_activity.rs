@@ -1,8 +1,10 @@
-use crate::{assets, engine};
 use jni::objects::{JClass, JObject};
 use jni::JNIEnv;
 use parakeet_rs::{ExecutionConfig as OrtExecutionConfig, Nemotron};
 use std::sync::Arc;
+
+use crate::assets;
+use crate::engine;
 
 #[no_mangle]
 pub unsafe extern "system" fn Java_com_catfewd_nemotron_MainActivity_initNative(
@@ -14,66 +16,100 @@ pub unsafe extern "system" fn Java_com_catfewd_nemotron_MainActivity_initNative(
         android_logger::Config::default().with_max_level(log::LevelFilter::Info),
     );
 
-    // Initialize ORT if not already
-    let _ = ort::init().commit();
-
     let vm = env.get_java_vm().expect("Failed to get JavaVM");
     let vm_arc = Arc::new(vm);
-    let activity_ref = env
-        .new_global_ref(&activity)
-        .expect("Failed to ref activity");
+    let activity_ref = env.new_global_ref(&activity).expect("Failed to ref activity");
 
     std::thread::spawn(move || {
         if let Ok(mut env) = vm_arc.attach_current_thread() {
             let act = activity_ref.as_obj();
 
-            // 1. Check if already loaded
             if engine::is_engine_loaded() {
-                notify_status(&mut env, act, "Ready");
+                notify_status(&mut env, &act, "Ready");
                 return;
             }
 
-            // 2. Attempt to claim loading rights
             if let Some(_guard) = engine::LoadingGuard::new() {
-                // We are the loader
-                notify_status(&mut env, act, "Checking assets...");
-                match assets::extract_assets(&mut env, act) {
-                    Ok(path) => {
-                        notify_status(&mut env, act, "Loading model (880MB)...");
-                        log::info!("Starting model load from: {:?}", path);
+                notify_status(&mut env, &act, "Loading model (Memory Mapped)...");
+                log::info!("Starting model load from APK");
+
+                match assets::get_mapped_assets(&mut env, &act) {
+                    Ok(mapped) => {
+                        let exec_cfg = OrtExecutionConfig::default();
                         
-                        let exec_cfg = OrtExecutionConfig::new()
-                            .with_intra_threads(2)
-                            .with_inter_threads(1);
-                        
-                        match Nemotron::from_pretrained(&path, Some(exec_cfg)) {
-                            Ok(engine_instance) => {
-                                log::info!("Model loaded successfully");
-                                engine::set_engine(engine_instance);
-                                notify_status(&mut env, act, "Ready");
+                        let application_info_obj = env.call_method(act, "getApplicationInfo", "()Landroid/content/pm/ApplicationInfo;", &[]).unwrap().l().unwrap();
+                        let source_dir_j = env.get_field(&application_info_obj, "sourceDir", "Ljava/lang/String;").unwrap().l().unwrap();
+                        let apk_path: String = env.get_string(&source_dir_j.into()).unwrap().into();
+
+                        let encoder_bytes = match assets::get_asset_slice(&mapped.encoder, "assets/nemotron-model/encoder.onnx", &apk_path) {
+                            Ok(b) => b,
+                            Err(e) => {
+                                log::error!("Failed to slice encoder: {}", e);
+                                notify_status(&mut env, &act, &format!("Error: {}", e));
+                                return;
+                            }
+                        };
+                        let decoder_bytes = match assets::get_asset_slice(&mapped.decoder, "assets/nemotron-model/decoder_joint.onnx", &apk_path) {
+                            Ok(b) => b,
+                            Err(e) => {
+                                log::error!("Failed to slice decoder: {}", e);
+                                notify_status(&mut env, &act, &format!("Error: {}", e));
+                                return;
+                            }
+                        };
+
+                        let chunk_size = {
+                            let mut chunk_val = None;
+                            let settings_str = env.new_string("settings").unwrap();
+                            if let Ok(prefs) = env.call_method(
+                                act,
+                                "getSharedPreferences",
+                                "(Ljava/lang/String;I)Landroid/content/SharedPreferences;",
+                                &[(&settings_str).into(), 0.into()],
+                            ) {
+                                let key_str = env.new_string("chunk_size").unwrap();
+                                if let Ok(val) = env.call_method(
+                                    prefs.l().unwrap(),
+                                    "getInt",
+                                    "(Ljava/lang/String;I)I",
+                                    &[(&key_str).into(), 56.into()],
+                                ) {
+                                    chunk_val = Some(val.i().unwrap() as usize);
+                                }
+                            }
+                            chunk_val
+                        };
+
+                        match Nemotron::from_memory(
+                            encoder_bytes,
+                            decoder_bytes,
+                            &mapped.tokenizer,
+                            Some(exec_cfg),
+                            chunk_size,
+                        ) {
+                            Ok(eng) => {
+                                log::info!("Loaded model successfully from memory map");
+                                engine::set_engine(eng);
+                                notify_status(&mut env, &act, "Ready");
                             }
                             Err(e) => {
                                 log::error!("Model load failed: {}", e);
-                                notify_status(&mut env, act, &format!("Model Error: {}", e));
+                                notify_status(&mut env, &act, &format!("Error: {}", e));
                             }
                         }
                     }
                     Err(e) => {
-                        log::error!("Asset Error: {}", e);
-                        notify_status(&mut env, act, &format!("Asset Error: {}", e));
+                        log::error!("Asset mapping failed: {}", e);
+                        notify_status(&mut env, &act, &format!("Error: {}", e));
                     }
                 }
-                // _guard drops here
             } else {
-                // 3. Someone else is loading.
-                notify_status(&mut env, act, "Waiting for model...");
+                notify_status(&mut env, &act, "Waiting for model...");
                 while engine::is_loading() {
                     std::thread::sleep(std::time::Duration::from_millis(500));
                 }
                 if engine::is_engine_loaded() {
-                    notify_status(&mut env, act, "Ready");
-                } else {
-                    notify_status(&mut env, act, "Model failed in other thread");
+                    notify_status(&mut env, &act, "Ready");
                 }
             }
         }

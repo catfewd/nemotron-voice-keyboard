@@ -1,161 +1,60 @@
-use anyhow::{anyhow, Context};
+use anyhow::anyhow;
 use jni::objects::JObject;
 use jni::JNIEnv;
-use std::path::{Path, PathBuf};
+use memmap2::{Mmap, MmapOptions};
+use std::fs::File;
+use std::io::Read;
+use std::sync::Arc;
 
-const MODEL_ASSET_DIR: &str = "nemotron-model";
-const REQUIRED_FILES: [&str; 3] = [
-    "encoder.onnx",
-    "decoder_joint.onnx",
-    "tokenizer.model",
-];
-
-pub fn extract_assets(env: &mut JNIEnv, context: &JObject) -> anyhow::Result<PathBuf> {
-    let files_dir_obj = env
-        .call_method(context, "getFilesDir", "()Ljava/io/File;", &[])?
-        .l()?;
-    let path_str_obj = env
-        .call_method(
-            &files_dir_obj,
-            "getAbsolutePath",
-            "()Ljava/lang/String;",
-            &[],
-        )?
-        .l()?;
-    let path_string: String = env.get_string(&path_str_obj.into())?.into();
-
-    let base_path = PathBuf::from(path_string);
-    let model_dir = base_path.join(MODEL_ASSET_DIR);
-
-    if has_required_files(&model_dir) {
-        return Ok(model_dir);
-    }
-
-    std::fs::create_dir_all(&model_dir)?;
-
-    let asset_manager_obj = env
-        .call_method(
-            context,
-            "getAssets",
-            "()Landroid/content/res/AssetManager;",
-            &[],
-        )?
-        .l()?;
-
-    copy_assets_recursively(env, &asset_manager_obj, MODEL_ASSET_DIR, &base_path)?;
-
-    if has_required_files(&model_dir) {
-        Ok(model_dir)
-    } else {
-        Err(anyhow!(
-            "Nemotron assets missing required files in {:?}. Please run scripts/download_nemotron_model.sh.",
-            model_dir
-        ))
-    }
+pub struct MappedNemotron {
+    pub encoder: Arc<Mmap>,
+    pub decoder: Arc<Mmap>,
+    pub tokenizer: Vec<u8>,
 }
 
-fn has_required_files(dir: &Path) -> bool {
-    if !dir.exists() {
-        return false;
-    }
+pub fn get_mapped_assets(env: &mut JNIEnv, context: &JObject) -> anyhow::Result<MappedNemotron> {
+    // 1. Get APK path
+    let application_info_obj = env.call_method(context, "getApplicationInfo", "()Landroid/content/pm/ApplicationInfo;", &[])?.l()?;
+    let source_dir_j = env.get_field(&application_info_obj, "sourceDir", "Ljava/lang/String;")?.l()?;
+    let apk_path: String = env.get_string(&source_dir_j.into())?.into();
 
-    REQUIRED_FILES.iter().all(|name| dir.join(name).exists())
-}
+    // 2. Map APK
+    let file = File::open(&apk_path)?;
+    let mmap = unsafe { MmapOptions::new().map(&file)? };
+    let mmap_arc = Arc::new(mmap);
 
-fn copy_assets_recursively(
-    env: &mut JNIEnv,
-    asset_manager: &JObject,
-    path: &str,
-    target_root: &Path,
-) -> anyhow::Result<()> {
-    use jni::objects::JObjectArray;
-
-    let path_jstring = env.new_string(path)?;
-    let list_array_obj = env
-        .call_method(
-            asset_manager,
-            "list",
-            "(Ljava/lang/String;)[Ljava/lang/String;",
-            &[(&path_jstring).into()],
-        )?
-        .l()?;
-
-    let list_array: JObjectArray = list_array_obj.into();
-    let len = env.get_array_length(&list_array)?;
-
-    if len == 0 {
-        return copy_asset_file(env, asset_manager, path, target_root);
-    }
-
-    let target_dir = target_root.join(path);
-    std::fs::create_dir_all(&target_dir)?;
-
-    for i in 0..len {
-        let file_name_obj = env.get_object_array_element(&list_array, i)?;
-        let file_name: String = env.get_string(&file_name_obj.into())?.into();
-
-        let child_path = if path.is_empty() {
-            file_name
-        } else {
-            format!("{}/{}", path, file_name)
-        };
-
-        copy_assets_recursively(env, asset_manager, &child_path, target_root)?;
-    }
-    Ok(())
-}
-
-fn copy_asset_file(
-    env: &mut JNIEnv,
-    asset_manager: &JObject,
-    asset_path: &str,
-    target_root: &Path,
-) -> anyhow::Result<()> {
-    let path_jstring = env.new_string(asset_path)?;
-    let result = env.call_method(
-        asset_manager,
-        "open",
-        "(Ljava/lang/String;)Ljava/io/InputStream;",
-        &[(&path_jstring).into()],
-    );
-
-    match result {
-        Ok(stream_val) => {
-            let stream_obj = stream_val.l()?;
-            let target_file_path = target_root.join(asset_path);
-            if let Some(parent) = target_file_path.parent() {
-                std::fs::create_dir_all(parent)
-                    .with_context(|| format!("Failed to create asset directory {:?}", parent))?;
-            }
-
-            let mut file = std::fs::File::create(&target_file_path)?;
-            let mut buffer = [0u8; 8192];
-            let buffer_j = env.new_byte_array(8192)?;
-
-            loop {
-                let bytes_read = env
-                    .call_method(&stream_obj, "read", "([B)I", &[(&buffer_j).into()])?
-                    .i()?;
-
-                if bytes_read == -1 {
-                    break;
-                }
-
-                let bytes_read_usize = bytes_read as usize;
-                let buffer_slice = unsafe {
-                    std::slice::from_raw_parts_mut(buffer.as_mut_ptr() as *mut i8, bytes_read_usize)
-                };
-
-                env.get_byte_array_region(&buffer_j, 0, buffer_slice)?;
-
-                use std::io::Write;
-                file.write_all(&buffer[0..bytes_read_usize])?;
-            }
-
-            env.call_method(&stream_obj, "close", "()V", &[])?;
-            log::info!("Extracted: {:?}", target_file_path);
-            Ok(())
+    // 3. Find offsets
+    let zip_file = File::open(&apk_path)?;
+    let mut zip = zip::ZipArchive::new(zip_file)?;
+    
+    // Check compression for encoder
+    {
+        let encoder_info = zip.by_name("assets/nemotron-model/encoder.onnx")?;
+        if encoder_info.compression() != zip::CompressionMethod::Stored {
+            return Err(anyhow!("Model must be stored uncompressed in APK! Check build.sh."));
         }
-        Err(_) => Ok(()),
     }
+
+    // Read tokenizer
+    let tokenizer = {
+        let mut tokenizer_info = zip.by_name("assets/nemotron-model/tokenizer.model")?;
+        let mut buf = Vec::with_capacity(tokenizer_info.size() as usize);
+        tokenizer_info.read_to_end(&mut buf)?;
+        buf
+    };
+
+    Ok(MappedNemotron {
+        encoder: mmap_arc.clone(),
+        decoder: mmap_arc.clone(),
+        tokenizer,
+    })
+}
+
+pub fn get_asset_slice<'a>(mmap: &'a Mmap, asset_path: &str, apk_path: &str) -> anyhow::Result<&'a [u8]> {
+    let zip_file = File::open(apk_path)?;
+    let mut zip = zip::ZipArchive::new(zip_file)?;
+    let file_info = zip.by_name(asset_path)?;
+    let start = file_info.data_start() as usize;
+    let end = start + file_info.size() as usize;
+    Ok(&mmap[start..end])
 }

@@ -17,6 +17,14 @@
     <string name="section_subs">Live Subtitles</string>
     <string name="desc_subs">Display Nemotron captions for any audio playing on your device. When prompted, pick “Share entire screen” for best results.</string>
     <string name="btn_subs_start">Start Live Subtitles</string>
+    <string name="btn_advanced">Advanced Settings</string>
+    <string name="advanced_title">Inference Engine Settings</string>
+    <string name="desc_chunk_size">Inference Chunk Size (Latency vs Accuracy). Higher values improve punctuation but increase delay.</string>
+    <string name="chunk_80ms">80ms (Ultra-fast / Low Accuracy)</string>
+    <string name="chunk_160ms">160ms (Fast)</string>
+    <string name="chunk_560ms">560ms (Balanced - Default)</string>
+    <string name="btn_ok">OK</string>
+    <string name="btn_cancel">Cancel</string>
     
     <string name="status_label">Status:</string>
     <string name="status_checking">Checking assets...</string>

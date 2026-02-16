@@ -76,6 +76,31 @@ impl Default for NemotronModelConfig {
 }
 
 impl NemotronModel {
+    pub fn from_memory(
+        encoder_bytes: &[u8],
+        decoder_bytes: &[u8],
+        exec: ExecutionConfig,
+        config: NemotronModelConfig,
+    ) -> Result<Self> {
+        use ort::session::Session;
+
+        let encoder = exec
+            .apply_to_session_builder(Session::builder()?)?
+            .commit_from_memory(encoder_bytes)
+            .map_err(|e| Error::Model(format!("Failed to load encoder from memory: {e}")))?;
+
+        let decoder_joint = exec
+            .apply_to_session_builder(Session::builder()?)?
+            .commit_from_memory(decoder_bytes)
+            .map_err(|e| Error::Model(format!("Failed to load decoder from memory: {e}")))?;
+
+        Ok(Self {
+            encoder,
+            decoder_joint,
+            config,
+        })
+    }
+
     pub fn from_pretrained<P: AsRef<Path>>(
         model_dir: P,
         exec_config: ExecutionConfig,

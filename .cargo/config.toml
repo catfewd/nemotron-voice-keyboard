@@ -2,10 +2,17 @@
 linker = "aarch64-linux-android-clang"
 rustflags = [
     "-C", "link-arg=-Wl,-z,max-page-size=16384",
-    "-C", "link-arg=-lc++_shared"
+    "-C", "link-arg=-lc++_shared",
+    "-L", "/data/data/com.termux/files/usr/lib",
+    "-L", "/data/data/com.termux/files/home/transcribe_v2/fake_libs"
 ]
 
 [env]
-# Note: CC/CXX/AR are now managed by build.sh or the CI environment
+CC_aarch64_linux_android = "aarch64-linux-android-clang"
+CXX_aarch64_linux_android = "aarch64-linux-android-clang++"
+AR_aarch64_linux_android = "llvm-ar"
+CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER = "aarch64-linux-android-clang"
 ORT_STRATEGY = "manual"
-# ORT_LIB_LOCATION and ORT_INCLUDE_DIR are managed by build.sh
+ORT_LIB_LOCATION = "/data/data/com.termux/files/home/transcribe_v2/libs/onnxruntime/jni/arm64-v8a"
+ORT_INCLUDE_DIR = "/data/data/com.termux/files/home/transcribe_v2/libs/onnxruntime/headers"
+BINDGEN_EXTRA_CLANG_ARGS_aarch64_linux_android = "--sysroot=/data/data/com.termux/files/usr"

@@ -20,7 +20,7 @@ else
     ZIPALIGN=$(which zipalign)
     PLATFORM="/data/data/com.termux/files/home/android-sdk/platforms/android-33/android.jar"
     
-    export RUSTFLAGS="-L /data/data/com.termux/files/usr/lib -L $(pwd)/fake_libs"
+    export RUSTFLAGS="-L $(pwd)/fake_libs -L /data/data/com.termux/files/usr/lib"
     export ORT_LIB_LOCATION="$(pwd)/libs/onnxruntime/jni/arm64-v8a"
     export ORT_INCLUDE_DIR="$(pwd)/libs/onnxruntime/headers"
 fi
@@ -76,8 +76,8 @@ if [ "$GITHUB_ACTIONS" = "true" ]; then
     CPPLIB=$(find $ANDROID_NDK_HOME -name "libc++_shared.so" | grep "aarch64" | head -n 1)
     cp "$CPPLIB" build_manual/lib/arm64-v8a/
 else
-    # In Termux
-    cp /data/data/com.termux/files/usr/lib/libc++_shared.so build_manual/lib/arm64-v8a/
+    # In Termux, use the specific NDK one we identified
+    cp /data/data/com.termux/files/home/android-sdk/ndk/28.0.13004108/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so build_manual/lib/arm64-v8a/
 fi
 
 cd build_manual/apk

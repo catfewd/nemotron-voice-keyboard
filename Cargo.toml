@@ -14,6 +14,8 @@ anyhow = "1.0"
 jni = "0.21"
 once_cell = "1.19"
 crossbeam-channel = "0.5"
+memmap2 = "0.9"
+zip = "0.6"
 
 ort = { version = "2.0.0-rc.11", features = ["load-dynamic"] }
 parakeet-rs = { path = "./nemotron_lib", features = ["load-dynamic"] } # This is the commit for 2.0.0-rc.9 approximately, or I should use version.

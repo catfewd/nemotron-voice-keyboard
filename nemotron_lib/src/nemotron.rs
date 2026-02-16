@@ -33,7 +33,7 @@ const BLANK_ID: usize = 1024;
 const DECODER_LSTM_DIM: usize = 640;
 
 // Streaming chunk config
-const CHUNK_SIZE: usize = 56;
+const DEFAULT_CHUNK_SIZE: usize = 56;
 const PRE_ENCODE_CACHE: usize = 9;
 
 /// Minimal SentencePiece vocabulary loader.
@@ -202,9 +202,14 @@ pub struct Nemotron {
     audio_processed: usize,
     chunk_idx: usize,
     accumulated_tokens: Vec<usize>,
+    chunk_size: usize,
 }
 
 impl Nemotron {
+    pub fn get_chunk_size(&self) -> usize {
+        self.chunk_size
+    }
+
     /// Load Nemotron model from directory.
     ///
     /// Required files:
@@ -214,6 +219,7 @@ impl Nemotron {
     pub fn from_pretrained<P: AsRef<Path>>(
         path: P,
         exec_config: Option<ExecutionConfig>,
+        chunk_size: Option<usize>,
     ) -> Result<Self> {
         let path = path.as_ref();
 
@@ -249,7 +255,57 @@ impl Nemotron {
             audio_processed: 0,
             chunk_idx: 0,
             accumulated_tokens: Vec::new(),
+            chunk_size: chunk_size.unwrap_or(DEFAULT_CHUNK_SIZE),
         })
+    }
+
+    /// Load Nemotron model directly from memory buffers.
+    pub fn from_memory(
+        encoder_bytes: &[u8],
+        decoder_bytes: &[u8],
+        tokenizer_bytes: &[u8],
+        exec_config: Option<ExecutionConfig>,
+        chunk_size: Option<usize>,
+    ) -> Result<Self> {
+        let vocab = Self::parse_vocab_from_bytes(tokenizer_bytes)?;
+
+        let model_config = NemotronModelConfig {
+            num_encoder_layers: NUM_ENCODER_LAYERS,
+            hidden_dim: HIDDEN_DIM,
+            left_context: LEFT_CONTEXT,
+            conv_context: CONV_CONTEXT,
+            decoder_lstm_dim: DECODER_LSTM_DIM,
+            decoder_lstm_layers: 2,
+            vocab_size: VOCAB_SIZE,
+            blank_id: BLANK_ID,
+        };
+
+        let exec = exec_config.unwrap_or_default();
+        let model = NemotronModel::from_memory(encoder_bytes, decoder_bytes, exec, model_config)?;
+
+        let encoder_cache =
+            NemotronEncoderCache::with_dims(NUM_ENCODER_LAYERS, LEFT_CONTEXT, HIDDEN_DIM, CONV_CONTEXT);
+
+        Ok(Self {
+            model,
+            vocab,
+            encoder_cache,
+            state_1: Array3::zeros((2, 1, DECODER_LSTM_DIM)),
+            state_2: Array3::zeros((2, 1, DECODER_LSTM_DIM)),
+            last_token: BLANK_ID as i32,
+            mel_basis: crate::audio::create_mel_filterbank(N_FFT, N_MELS, SAMPLE_RATE),
+            window: Self::create_window(),
+            audio_buffer: Vec::new(),
+            audio_processed: 0,
+            chunk_idx: 0,
+            accumulated_tokens: Vec::new(),
+            chunk_size: chunk_size.unwrap_or(DEFAULT_CHUNK_SIZE),
+        })
+    }
+
+    fn parse_vocab_from_bytes(data: &[u8]) -> Result<SentencePieceVocab> {
+        let pieces = SentencePieceVocab::parse_sentencepiece_model(data)?;
+        Ok(SentencePieceVocab { pieces })
     }
 
     /// Reset all state for new utterance
@@ -308,10 +364,10 @@ impl Nemotron {
         let mut chunk_idx = 0;
 
         while buffer_idx < total_frames {
-            let chunk_end = (buffer_idx + CHUNK_SIZE).min(total_frames);
+            let chunk_end = (buffer_idx + self.chunk_size).min(total_frames);
             let main_len = chunk_end - buffer_idx;
 
-            let expected_size = PRE_ENCODE_CACHE + CHUNK_SIZE;
+            let expected_size = PRE_ENCODE_CACHE + self.chunk_size;
             let mut chunk_data = vec![0.0f32; N_MELS * expected_size];
 
             // Fill pre-encode cache from previous frames
@@ -344,7 +400,7 @@ impl Nemotron {
             let new_tokens = self.decode_chunk(&encoded, enc_len as usize)?;
             all_tokens.extend(new_tokens);
 
-            buffer_idx += CHUNK_SIZE;
+            buffer_idx += self.chunk_size;
             chunk_idx += 1;
         }
 
@@ -379,22 +435,22 @@ impl Nemotron {
 
         // Check if we have enough NEW frames to process a chunk
         let available_new_frames = total_mel_frames.saturating_sub(processed_mel_frames);
-        if available_new_frames < CHUNK_SIZE {
+        if available_new_frames < self.chunk_size {
             return Ok(String::new());
         }
 
         // Build encoder input chunk
-        let expected_size = PRE_ENCODE_CACHE + CHUNK_SIZE;
+        let expected_size = PRE_ENCODE_CACHE + self.chunk_size;
         let mut chunk_data = vec![0.0f32; N_MELS * expected_size];
 
         // Determine the mel frame range for this chunk
         let is_first_chunk = self.chunk_idx == 0;
         let main_start = processed_mel_frames;
-        let _main_end = main_start + CHUNK_SIZE;
+        let _main_end = main_start + self.chunk_size;
 
         if is_first_chunk {
             // First chunk: zero-pad for pre-encode cache
-            for f in 0..CHUNK_SIZE.min(total_mel_frames) {
+            for f in 0..self.chunk_size.min(total_mel_frames) {
                 for m in 0..N_MELS {
                     chunk_data[m * expected_size + PRE_ENCODE_CACHE + f] = full_mel[[m, f]];
                 }
@@ -413,7 +469,7 @@ impl Nemotron {
             }
 
             // Fill main chunk
-            for f in 0..CHUNK_SIZE.min(total_mel_frames - main_start) {
+            for f in 0..self.chunk_size.min(total_mel_frames - main_start) {
                 for m in 0..N_MELS {
                     chunk_data[m * expected_size + PRE_ENCODE_CACHE + f] = full_mel[[m, main_start + f]];
                 }
@@ -432,12 +488,12 @@ impl Nemotron {
         self.accumulated_tokens.extend(&tokens);
 
         // Advance processed position
-        self.audio_processed += CHUNK_SIZE * HOP_LENGTH;
+        self.audio_processed += self.chunk_size * HOP_LENGTH;
         self.chunk_idx += 1;
 
         // Trim audio buffer to keep memory bounded
         // Keep enough for pre-encode cache context
-        let keep_samples = (PRE_ENCODE_CACHE + CHUNK_SIZE) * HOP_LENGTH + WIN_LENGTH;
+        let keep_samples = (PRE_ENCODE_CACHE + self.chunk_size) * HOP_LENGTH + WIN_LENGTH;
         if self.audio_buffer.len() > keep_samples * 2 {
             let remove = self.audio_buffer.len() - keep_samples;
             // Adjust processed counter since we're removing from the start

@@ -39,9 +39,17 @@ jobs:
         echo "ANDROID_NDK_HOME=$ANDROID_HOME/android-ndk-r28" >> $GITHUB_ENV
         TOOLCHAIN_BIN=$ANDROID_HOME/android-ndk-r28/toolchains/llvm/prebuilt/linux-x86_64/bin
         echo "$TOOLCHAIN_BIN" >> $GITHUB_PATH
-        # Create symlinks for generic names that many crates expect
+        # Create symlinks for generic names
         ln -s $TOOLCHAIN_BIN/aarch64-linux-android33-clang $TOOLCHAIN_BIN/aarch64-linux-android-clang
         ln -s $TOOLCHAIN_BIN/aarch64-linux-android33-clang++ $TOOLCHAIN_BIN/aarch64-linux-android-clang++
+        
+        # Populate fake_libs just like local Termux build
+        mkdir -p $GITHUB_WORKSPACE/fake_libs
+        NDK_SYSROOT=$ANDROID_HOME/android-ndk-r28/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android
+        NDK_CLANG_LIBS=$ANDROID_HOME/android-ndk-r28/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/19/lib/linux/aarch64
+        cp $NDK_SYSROOT/libc++_static.a $GITHUB_WORKSPACE/fake_libs/
+        cp $NDK_SYSROOT/libc++abi.a $GITHUB_WORKSPACE/fake_libs/
+        cp $NDK_CLANG_LIBS/libunwind.a $GITHUB_WORKSPACE/fake_libs/
 
     - name: Download Nemotron Model
       run: |
@@ -54,18 +62,10 @@ jobs:
     - name: Build APK
       run: |
         chmod +x build.sh
-        # Clear any environment variables that might contain Termux paths
+        # Clear environment to avoid conflicts
         unset RUSTFLAGS
         unset ORT_LIB_LOCATION
         unset ORT_INCLUDE_DIR
-        
-        # Set NDK tool paths explicitly for Rust/Cargo
-        export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
-        export CC=$TOOLCHAIN/bin/aarch64-linux-android33-clang
-        export CXX=$TOOLCHAIN/bin/aarch64-linux-android33-clang++
-        export AR=$TOOLCHAIN/bin/llvm-ar
-        export LD=$TOOLCHAIN/bin/ld
-        export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$CC
         
         # Force create a fresh debug keystore for CI
         mkdir -p $HOME/.android

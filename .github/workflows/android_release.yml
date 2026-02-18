@@ -77,5 +77,5 @@ jobs:
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
       with:
-        name: Nemotron Voice Keyboard v0.1.11
+        name: Nemotron Voice Keyboard v0.1.13
         files: Nemotron_Voice_Keyboard.apk

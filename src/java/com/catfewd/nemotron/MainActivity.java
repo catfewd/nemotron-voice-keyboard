@@ -22,9 +22,15 @@ public class MainActivity extends Activity implements View.OnClickListener, andr
             System.loadLibrary("c++_shared");
             System.loadLibrary("onnxruntime");
         } catch (UnsatisfiedLinkError e) {
-            Log.w(TAG, "Failed to load dependencies", e);
+            Log.e(TAG, "Failed to load core dependencies: " + e.getMessage());
         }
-        System.loadLibrary("android_transcribe_app");
+        
+        try {
+            System.loadLibrary("android_transcribe_app");
+        } catch (UnsatisfiedLinkError e) {
+            Log.e(TAG, "FATAL: Failed to load android_transcribe_app: " + e.getMessage());
+            throw e; // Still throw to crash, but now we have the log
+        }
     }
 
     private TextView statusText;

@@ -38,6 +38,8 @@ public class RustInputMethodService extends InputMethodService {
     private ProgressBar progressBar;
     private Handler mainHandler;
     private boolean isRecording = false;
+    private boolean isEngineReady = false;
+    private boolean autoStartPending = false;
     private String lastStatus = "Initializing...";
 
     @Override
@@ -98,6 +100,10 @@ public class RustInputMethodService extends InputMethodService {
                     stopRecording();
                     updateRecordButtonUI(false);
                 } else {
+                    if (!isEngineReady) {
+                        if (statusView != null) statusView.setText("Please wait, model loading...");
+                        return;
+                    }
                     startRecording();
                     updateRecordButtonUI(true);
                 }
@@ -142,14 +148,21 @@ public class RustInputMethodService extends InputMethodService {
         super.onStartInputView(info, restarting);
         Log.d(TAG, "onStartInputView");
         
-        // Auto-start recording if permissions are granted
+        // Auto-start recording logic
         if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-            mainHandler.postDelayed(() -> {
-                if (!isRecording) {
-                    startRecording();
-                    updateRecordButtonUI(true);
-                }
-            }, 300); // Small delay to ensure everything is ready
+            // If engine is ready, start immediately
+            if (isEngineReady) {
+                mainHandler.postDelayed(() -> {
+                    if (!isRecording) {
+                        startRecording();
+                        updateRecordButtonUI(true);
+                    }
+                }, 100);
+            } else {
+                // If not ready, queue it up
+                autoStartPending = true;
+                if (statusView != null) statusView.setText("Loading model... (Auto-start pending)");
+            }
         }
     }
 
@@ -198,6 +211,18 @@ public class RustInputMethodService extends InputMethodService {
         mainHandler.post(() -> {
             Log.d(TAG, "Status: " + status);
             lastStatus = status;
+            
+            if ("Ready".equals(status)) {
+                isEngineReady = true;
+                // Check if we were waiting to auto-start
+                if (autoStartPending) {
+                    autoStartPending = false;
+                    if (!isRecording) {
+                        startRecording();
+                        updateRecordButtonUI(true);
+                    }
+                }
+            }
             updateUiState();
         });
     }
@@ -252,6 +277,9 @@ public class RustInputMethodService extends InputMethodService {
             
             // Revert back to the previous input method
             switchToPreviousInputMethod();
+            
+            // DEBUG: Confirm ITN ran
+            android.widget.Toast.makeText(this, "ITN Applied", android.widget.Toast.LENGTH_SHORT).show();
         });
     }
 }

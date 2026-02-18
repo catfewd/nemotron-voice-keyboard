@@ -15,6 +15,7 @@ pub unsafe extern "system" fn Java_com_catfewd_nemotron_MainActivity_initNative(
     android_logger::init_once(
         android_logger::Config::default().with_max_level(log::LevelFilter::Info),
     );
+    crate::log_to_file("MainActivity: initNative called");
 
     let vm = env.get_java_vm().expect("Failed to get JavaVM");
     let vm_arc = Arc::new(vm);
@@ -25,11 +26,13 @@ pub unsafe extern "system" fn Java_com_catfewd_nemotron_MainActivity_initNative(
             let act = activity_ref.as_obj();
 
             if engine::is_engine_loaded() {
+                crate::log_to_file("MainActivity: Engine already loaded");
                 notify_status(&mut env, &act, "Ready");
                 return;
             }
 
             if let Some(_guard) = engine::LoadingGuard::new() {
+                crate::log_to_file("MainActivity: Starting model load (direct memory map)");
                 notify_status(&mut env, &act, "Loading model (Memory Mapped)...");
                 log::info!("Starting model load from APK");
 
@@ -44,7 +47,9 @@ pub unsafe extern "system" fn Java_com_catfewd_nemotron_MainActivity_initNative(
                         let encoder_bytes = match assets::get_asset_slice(&mapped.encoder, "assets/nemotron-model/encoder.onnx", &apk_path) {
                             Ok(b) => b,
                             Err(e) => {
-                                log::error!("Failed to slice encoder: {}", e);
+                                let msg = format!("Failed to slice encoder: {}", e);
+                                log::error!("{}", msg);
+                                crate::log_to_file(&msg);
                                 notify_status(&mut env, &act, &format!("Error: {}", e));
                                 return;
                             }
@@ -52,7 +57,9 @@ pub unsafe extern "system" fn Java_com_catfewd_nemotron_MainActivity_initNative(
                         let decoder_bytes = match assets::get_asset_slice(&mapped.decoder, "assets/nemotron-model/decoder_joint.onnx", &apk_path) {
                             Ok(b) => b,
                             Err(e) => {
-                                log::error!("Failed to slice decoder: {}", e);
+                                let msg = format!("Failed to slice decoder: {}", e);
+                                log::error!("{}", msg);
+                                crate::log_to_file(&msg);
                                 notify_status(&mut env, &act, &format!("Error: {}", e));
                                 return;
                             }
@@ -77,6 +84,9 @@ pub unsafe extern "system" fn Java_com_catfewd_nemotron_MainActivity_initNative(
                                     chunk_val = Some(val.i().unwrap() as usize);
                                 }
                             }
+                            if let Some(v) = chunk_val {
+                                crate::log_to_file(&format!("MainActivity: Using chunk size pref: {}", v));
+                            }
                             chunk_val
                         };
 
@@ -89,26 +99,33 @@ pub unsafe extern "system" fn Java_com_catfewd_nemotron_MainActivity_initNative(
                         ) {
                             Ok(eng) => {
                                 log::info!("Loaded model successfully from memory map");
+                                crate::log_to_file("MainActivity: Model loaded successfully");
                                 engine::set_engine(eng);
                                 notify_status(&mut env, &act, "Ready");
                             }
                             Err(e) => {
-                                log::error!("Model load failed: {}", e);
+                                let msg = format!("Model load failed: {}", e);
+                                log::error!("{}", msg);
+                                crate::log_to_file(&msg);
                                 notify_status(&mut env, &act, &format!("Error: {}", e));
                             }
                         }
                     }
                     Err(e) => {
-                        log::error!("Asset mapping failed: {}", e);
+                        let msg = format!("Asset mapping failed: {}", e);
+                        log::error!("{}", msg);
+                        crate::log_to_file(&msg);
                         notify_status(&mut env, &act, &format!("Error: {}", e));
                     }
                 }
             } else {
+                crate::log_to_file("MainActivity: Waiting for existing load operation");
                 notify_status(&mut env, &act, "Waiting for model...");
                 while engine::is_loading() {
                     std::thread::sleep(std::time::Duration::from_millis(500));
                 }
                 if engine::is_engine_loaded() {
+                    crate::log_to_file("MainActivity: Engine became ready");
                     notify_status(&mut env, &act, "Ready");
                 }
             }

@@ -19,5 +19,5 @@ zip = "0.6"
 chrono = "0.4"
 nemo-text-processing = { git = "https://github.com/FluidInference/text-processing-rs" }
 
-ort = { version = "2.0.0-rc.11", features = ["load-dynamic"] }
-parakeet-rs = { path = "./nemotron_lib", features = ["load-dynamic"] }
+ort = { version = "2.0.0-rc.11", default-features = false, features = ["std"] }
+parakeet-rs = { path = "./nemotron_lib" }

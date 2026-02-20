@@ -19,17 +19,16 @@ public class MainActivity extends Activity implements View.OnClickListener, andr
 
     static {
         try {
-            System.loadLibrary("c++_shared");
             System.loadLibrary("onnxruntime");
         } catch (UnsatisfiedLinkError e) {
-            Log.e(TAG, "Failed to load core dependencies: " + e.getMessage());
+            Log.e(TAG, "Failed to load onnxruntime: " + e.getMessage());
         }
         
         try {
             System.loadLibrary("android_transcribe_app");
         } catch (UnsatisfiedLinkError e) {
             Log.e(TAG, "FATAL: Failed to load android_transcribe_app: " + e.getMessage());
-            throw e; // Still throw to crash, but now we have the log
+            throw e;
         }
     }
 
@@ -95,7 +94,7 @@ public class MainActivity extends Activity implements View.OnClickListener, andr
         } else if (id == R.id.text_welcome_subtitle) {
             openUrl("https://huggingface.co/lokkju/nemotron-speech-streaming-en-0.6b-int8");
         } else if (id == R.id.credit_catfewd) {
-            openUrl("https://github.com/catfewd/nemotron-voice-keyboard");
+            openUrl("https://github.com.catfewd.nemotron-voice-keyboard");
         } else if (id == R.id.credit_altunenes) {
             openUrl("https://github.com/altunenes/parakeet-rs");
         } else if (id == R.id.credit_notune) {

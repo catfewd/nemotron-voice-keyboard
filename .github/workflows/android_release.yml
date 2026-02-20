@@ -52,7 +52,7 @@ jobs:
       run: |
         NDK_TOOLCHAIN=$ANDROID_HOME/android-ndk-r28/toolchains/llvm/prebuilt/linux-x86_64
         mkdir -p .cargo
-        cat > .cargo/config.toml << CARGOEOF
+        cat > .cargo/config.toml << EOF
         [target.aarch64-linux-android]
         linker = "$NDK_TOOLCHAIN/bin/aarch64-linux-android26-clang"
         rustflags = [
@@ -62,26 +62,12 @@ jobs:
             "-C", "link-arg=-lonnxruntime",
             "-C", "link-arg=-llog"
         ]
-        CARGOEOF
-
+        EOF
 
     - name: Patch ort-sys build script
       run: |
         cargo fetch --target aarch64-linux-android 2>/dev/null || true
-        ORT_SYS=$(find ~/.cargo/registry/src -name "main.rs" -path "*/ort-sys*" 2>/dev/null | head -1)
-        if [ -n "$ORT_SYS" ]; then
-          python3 -c "
-path = '$ORT_SYS'
-with open(path, 'r') as f:
-    lines = f.readlines()
-lines[96] = '\t\tlet bin_extract_dir = std::path::PathBuf::from(\"/tmp/ort-cache\")\n'
-lines[97] = '\t\t\t// patched\n'
-with open(path, 'w') as f:
-    f.writelines(lines)
-print('Patched:', path)
-"
-        fi
-        mkdir -p /tmp/ort-cache
+        python3 patch_ort_sys.py
 
     - name: Build Rust
       run: |

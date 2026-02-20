@@ -71,11 +71,10 @@ jobs:
         cargo fetch --target aarch64-linux-android 2>/dev/null || true
         python3 patch_ort_sys.py
 
-    - name: Build Rust
+    - name: Use prebuilt Rust library
       run: |
-        export XDG_CACHE_HOME=$GITHUB_WORKSPACE/.cache
-        mkdir -p $GITHUB_WORKSPACE/.cache
-        cargo build --target aarch64-linux-android --release
+        echo "Using prebuilt libandroid_transcribe_app.so from jniLibs"
+        ls -la jniLibs/arm64-v8a/
 
     - name: Build APK
       run: |
@@ -96,7 +95,7 @@ jobs:
         find build_manual/obj -name "*.class" > build_manual/classes.txt
         $BUILD_TOOLS/d8 --output build_manual/apk --lib $PLATFORM @build_manual/classes.txt
 
-        cp target/aarch64-linux-android/release/libandroid_transcribe_app.so build_manual/lib/arm64-v8a/
+        cp jniLibs/arm64-v8a/libandroid_transcribe_app.so build_manual/lib/arm64-v8a/
         cp jniLibs/arm64-v8a/libonnxruntime.so build_manual/lib/arm64-v8a/
 
         cd build_manual/apk

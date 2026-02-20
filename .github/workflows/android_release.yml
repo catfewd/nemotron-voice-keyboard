@@ -71,10 +71,8 @@ jobs:
 
     - name: Build Rust
       run: |
-        export ORT_STRATEGY=system
-        export ORT_LIB_LOCATION=$GITHUB_WORKSPACE/jniLibs/arm64-v8a
-        export ORT_INCLUDE_DIR=$GITHUB_WORKSPACE/libs/onnxruntime/headers
-        export ORT_SKIP_DOWNLOAD=1
+        export XDG_CACHE_HOME=$GITHUB_WORKSPACE/.cache
+        mkdir -p $GITHUB_WORKSPACE/.cache
         cargo build --target aarch64-linux-android --release
 
     - name: Build APK

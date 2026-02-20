@@ -23,11 +23,16 @@ with open(path, 'r') as f:
 for i, line in enumerate(lines):
     if 'cache_dir()' in line:
         print(f"Found cache_dir at line {i+1}: {repr(line)}")
-        print(f"Next line {i+2}: {repr(lines[i+1])}")
-        lines[i] = '\t\t\tlet bin_extract_dir = std::path::PathBuf::from("/tmp/ort-cache")\n'
-        lines[i+1] = '\t\t\t\t// patched\n'
-        print("Patched successfully")
+        # Detect indentation from the line itself
+        indent = len(line) - len(line.lstrip('\t'))
+        tabs = '\t' * indent
+        lines[i] = tabs + 'let bin_extract_dir = std::path::PathBuf::from("/tmp/ort-cache")\n'
+        lines[i+1] = tabs + '\t// patched\n'
+        print(f"Patched with {indent} tabs")
         break
+else:
+    print("cache_dir not found in file")
+    sys.exit(1)
 
 with open(path, 'w') as f:
     f.writelines(lines)

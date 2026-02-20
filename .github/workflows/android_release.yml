@@ -39,6 +39,8 @@ jobs:
         echo "ANDROID_NDK_HOME=$ANDROID_HOME/android-ndk-r28" >> $GITHUB_ENV
         TOOLCHAIN_BIN=$ANDROID_HOME/android-ndk-r28/toolchains/llvm/prebuilt/linux-x86_64/bin
         echo "$TOOLCHAIN_BIN" >> $GITHUB_PATH
+        # Install required Android platform
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-33" "build-tools;34.0.0" 
 
     - name: Download Nemotron Model
       run: |

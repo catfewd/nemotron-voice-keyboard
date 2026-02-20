@@ -25,3 +25,10 @@ FINAL_RESTORE/
 Terminal transcript.txt
 restored_app/
 build_manual/
+
+# Debug logs (may contain sensitive user data)
+*.log
+crash_log.txt
+startup_crash*.log
+recording_*.log
+nemotron_debug.log

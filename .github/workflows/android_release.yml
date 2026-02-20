@@ -39,17 +39,6 @@ jobs:
         echo "ANDROID_NDK_HOME=$ANDROID_HOME/android-ndk-r28" >> $GITHUB_ENV
         TOOLCHAIN_BIN=$ANDROID_HOME/android-ndk-r28/toolchains/llvm/prebuilt/linux-x86_64/bin
         echo "$TOOLCHAIN_BIN" >> $GITHUB_PATH
-        # Create symlinks for generic names
-        ln -s $TOOLCHAIN_BIN/aarch64-linux-android33-clang $TOOLCHAIN_BIN/aarch64-linux-android-clang
-        ln -s $TOOLCHAIN_BIN/aarch64-linux-android33-clang++ $TOOLCHAIN_BIN/aarch64-linux-android-clang++
-        
-        # Populate fake_libs just like local Termux build
-        mkdir -p $GITHUB_WORKSPACE/fake_libs
-        NDK_SYSROOT=$ANDROID_HOME/android-ndk-r28/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android
-        NDK_CLANG_LIBS=$ANDROID_HOME/android-ndk-r28/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/19/lib/linux/aarch64
-        cp $NDK_SYSROOT/libc++_static.a $GITHUB_WORKSPACE/fake_libs/
-        cp $NDK_SYSROOT/libc++abi.a $GITHUB_WORKSPACE/fake_libs/
-        cp $NDK_CLANG_LIBS/libunwind.a $GITHUB_WORKSPACE/fake_libs/
 
     - name: Download Nemotron Model
       run: |
@@ -59,23 +48,76 @@ jobs:
         curl -L -o decoder_joint.onnx "https://huggingface.co/lokkju/nemotron-speech-streaming-en-0.6b-int8/resolve/main/decoder_joint.onnx?download=true"
         curl -L -o tokenizer.model "https://huggingface.co/lokkju/nemotron-speech-streaming-en-0.6b-int8/resolve/main/tokenizer.model?download=true"
 
+    - name: Configure Cargo for NDK
+      run: |
+        NDK_TOOLCHAIN=$ANDROID_HOME/android-ndk-r28/toolchains/llvm/prebuilt/linux-x86_64
+        mkdir -p .cargo
+        cat > .cargo/config.toml << CARGOEOF
+        [target.aarch64-linux-android]
+        linker = "$NDK_TOOLCHAIN/bin/aarch64-linux-android26-clang"
+        rustflags = [
+            "-C", "link-arg=--sysroot=$NDK_TOOLCHAIN/sysroot",
+            "-C", "link-arg=-static-libstdc++",
+            "-C", "link-arg=-L$GITHUB_WORKSPACE/jniLibs/arm64-v8a",
+            "-C", "link-arg=-lonnxruntime",
+            "-C", "link-arg=-llog"
+        ]
+        CARGOEOF
+
+    - name: Build Rust
+      run: |
+        export ORT_STRATEGY=system
+        export ORT_LIB_LOCATION=$GITHUB_WORKSPACE/jniLibs/arm64-v8a
+        export ORT_INCLUDE_DIR=$GITHUB_WORKSPACE/libs/onnxruntime/headers
+        export ORT_SKIP_DOWNLOAD=1
+        cargo build --target aarch64-linux-android --release
+
     - name: Build APK
       run: |
-        chmod +x build.sh
-        # Clear environment to avoid conflicts
-        unset RUSTFLAGS
-        unset ORT_LIB_LOCATION
-        unset ORT_INCLUDE_DIR
-        
-        # Force create a fresh debug keystore for CI
+        PLATFORM=$ANDROID_HOME/platforms/android-33/android.jar
+        BUILD_TOOLS=$ANDROID_HOME/build-tools/$(ls $ANDROID_HOME/build-tools | tail -1)
+        mkdir -p build_manual/gen build_manual/obj build_manual/apk build_manual/lib/arm64-v8a
+
+        $BUILD_TOOLS/aapt2 compile --dir res -o build_manual/resources.zip
+        $BUILD_TOOLS/aapt2 link -I $PLATFORM --manifest AndroidManifest.xml \
+          -o build_manual/apk/unaligned.apk build_manual/resources.zip \
+          --java build_manual/gen --auto-add-overlay
+
+        find src/java -name "*.java" > build_manual/sources.txt
+        find build_manual/gen -name "*.java" >> build_manual/sources.txt
+        javac -d build_manual/obj -source 1.8 -target 1.8 \
+          -classpath $PLATFORM @build_manual/sources.txt
+
+        find build_manual/obj -name "*.class" > build_manual/classes.txt
+        $BUILD_TOOLS/d8 --output build_manual/apk --lib $PLATFORM @build_manual/classes.txt
+
+        cp target/aarch64-linux-android/release/libandroid_transcribe_app.so build_manual/lib/arm64-v8a/
+        cp jniLibs/arm64-v8a/libonnxruntime.so build_manual/lib/arm64-v8a/
+
+        cd build_manual/apk
+        zip -g unaligned.apk classes.dex
+        cp -r ../lib .
+        zip -r0 unaligned.apk lib
+        cd $GITHUB_WORKSPACE
+        zip -r0 build_manual/apk/unaligned.apk assets/
+
         mkdir -p $HOME/.android
-        rm -f $HOME/.android/debug.keystore
-        keytool -genkey -v -keystore $HOME/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "cn=Android Debug, ou=Unknown, o=Unknown, c=US"
-        ./build.sh
+        keytool -genkey -v -keystore $HOME/.android/debug.keystore \
+          -storepass android -alias androiddebugkey -keypass android \
+          -keyalg RSA -keysize 2048 -validity 10000 \
+          -dname "CN=Android Debug, OU=Unknown, O=Unknown, C=US"
+
+        $BUILD_TOOLS/zipalign -f -p -v 4 \
+          build_manual/apk/unaligned.apk build_manual/apk/aligned.apk
+        $BUILD_TOOLS/apksigner sign \
+          --ks $HOME/.android/debug.keystore \
+          --ks-pass pass:android --key-pass pass:android \
+          --ks-key-alias androiddebugkey \
+          --out Nemotron_Voice_Keyboard.apk build_manual/apk/aligned.apk
 
     - name: Create Release and Upload
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
       with:
-        name: Nemotron Voice Keyboard v0.1.13
+        name: Nemotron Voice Keyboard v0.1.14
         files: Nemotron_Voice_Keyboard.apk

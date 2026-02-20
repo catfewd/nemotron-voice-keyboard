@@ -20,3 +20,8 @@ futo_ref_dir/
 # Termux/OS files
 .gemini/
 .DS_Store
+.cache/
+FINAL_RESTORE/
+Terminal transcript.txt
+restored_app/
+build_manual/

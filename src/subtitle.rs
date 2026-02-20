@@ -63,8 +63,7 @@ pub unsafe extern "system" fn Java_com_catfewd_nemotron_LiveSubtitleService_init
     thread::spawn(move || {
         let mut env = match vm_worker.attach_current_thread() {
             Ok(e) => e,
-            Err(e) => {
-                log::error!("Worker failed to attach JNI thread: {}", e);
+            Err(_) => {
                 return;
             }
         };
@@ -74,7 +73,6 @@ pub unsafe extern "system" fn Java_com_catfewd_nemotron_LiveSubtitleService_init
         let engine_arc = match wait_for_engine(Duration::from_secs(120)) {
             Some(arc) => arc,
             None => {
-                log::error!("Nemotron engine not ready for LiveSubtitleService");
                 return;
             }
         };
@@ -91,16 +89,14 @@ pub unsafe extern "system" fn Java_com_catfewd_nemotron_LiveSubtitleService_init
             let new_text = {
                 let mut eng = match engine_arc.lock() {
                     Ok(guard) => guard,
-                    Err(poisoned) => {
-                        log::error!("Nemotron mutex poisoned: {}", poisoned);
+                    Err(_) => {
                         break;
                     }
                 };
 
                 match eng.transcribe_chunk(&chunk) {
                     Ok(txt) => txt,
-                    Err(e) => {
-                        log::error!("Nemotron chunk inference failed: {}", e);
+                    Err(_) => {
                         continue;
                     }
                 }
@@ -162,11 +158,6 @@ pub unsafe extern "system" fn Java_com_catfewd_nemotron_LiveSubtitleService_setU
         };
         let desired_samples = (seconds * SAMPLE_RATE as f32) as usize;
         state.chunk_size = clamp_chunk_size(desired_samples);
-        log::info!(
-            "Live subtitles chunk size set to {} samples (~{:.2} s)",
-            state.chunk_size,
-            state.chunk_size as f32 / SAMPLE_RATE as f32
-        );
     }
 }
 
@@ -183,8 +174,7 @@ pub unsafe extern "system" fn Java_com_catfewd_nemotron_LiveSubtitleService_push
     }
 
     let mut incoming = vec![0f32; len];
-    if let Err(e) = env.get_float_array_region(&data, 0, &mut incoming) {
-        log::error!("Failed to read float array region: {}", e);
+    if let Err(_) = env.get_float_array_region(&data, 0, &mut incoming) {
         return;
     }
 

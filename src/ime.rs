@@ -101,18 +101,15 @@ pub unsafe extern "system" fn Java_com_catfewd_nemotron_RustInputMethodService_i
                             chunk_size,
                         ) {
                             Ok(eng) => {
-                                log::info!("IME loaded model successfully from memory map");
                                 engine::set_engine(eng);
                                 notify_status(&mut env, srv, "Ready");
                             }
                             Err(e) => {
-                                log::error!("IME model load failed: {}", e);
                                 notify_status(&mut env, srv, &format!("Error: {}", e));
                             }
                         }
                     }
                     Err(e) => {
-                        log::error!("Asset mapping failed: {}", e);
                         notify_status(&mut env, srv, &format!("Error: {}", e));
                     }
                 }
@@ -158,13 +155,10 @@ pub unsafe extern "system" fn Java_com_catfewd_nemotron_RustInputMethodService_s
 ) {
     let mut state_guard = IME_STATE.lock().unwrap();
     if let Some(state) = state_guard.as_mut() {
-        crate::log_to_file("IME: startRecording called");
-        
         let host = cpal::default_host();
         let device = match host.default_input_device() {
             Some(d) => d,
             None => {
-                crate::log_to_file("IME Error: No input device found");
                 return;
             },
         };
@@ -177,8 +171,7 @@ pub unsafe extern "system" fn Java_com_catfewd_nemotron_RustInputMethodService_s
 
         state.audio_buffer.lock().unwrap().clear();
         state.is_streaming.store(true, std::sync::atomic::Ordering::Release);
-        crate::log_to_file("IME: is_streaming set to TRUE");
-        
+
         let buffer_clone = state.audio_buffer.clone();
         let is_streaming_clone = state.is_streaming.clone();
         let jvm_clone = state.jvm.clone();
@@ -187,14 +180,10 @@ pub unsafe extern "system" fn Java_com_catfewd_nemotron_RustInputMethodService_s
         std::thread::spawn(move || {
             let mut env = jvm_clone.attach_current_thread().unwrap();
             let service_obj = service_ref_clone.as_obj();
-            
+
             let engine_arc = match engine::get_engine() {
-                Some(e) => {
-                    crate::log_to_file("IME: Engine acquired for thread");
-                    e
-                },
+                Some(e) => e,
                 None => {
-                    crate::log_to_file("IME Error: Engine not ready in worker thread!");
                     return;
                 },
             };
@@ -203,7 +192,6 @@ pub unsafe extern "system" fn Java_com_catfewd_nemotron_RustInputMethodService_s
             {
                 if let Ok(eng) = engine_arc.lock() {
                     chunk_size = eng.get_chunk_size() * 160;
-                    crate::log_to_file(&format!("IME: Using chunk size: {}", chunk_size));
                 }
             }
 
@@ -214,7 +202,7 @@ pub unsafe extern "system" fn Java_com_catfewd_nemotron_RustInputMethodService_s
 
             while is_streaming_clone.load(std::sync::atomic::Ordering::Acquire) {
                 let mut chunk_to_process = None;
-                
+
                 {
                     let mut shared_buffer = buffer_clone.lock().unwrap();
                     if shared_buffer.len() >= chunk_size {
@@ -241,7 +229,6 @@ pub unsafe extern "system" fn Java_com_catfewd_nemotron_RustInputMethodService_s
                     std::thread::sleep(std::time::Duration::from_millis(100));
                 }
             }
-            crate::log_to_file("IME: Worker thread exiting loop");
 
             let engine_arc = match engine::get_engine() {
                 Some(e) => e,
@@ -251,13 +238,10 @@ pub unsafe extern "system" fn Java_com_catfewd_nemotron_RustInputMethodService_s
                 let eng = engine_arc.lock().unwrap();
                 eng.get_transcript()
             };
-            crate::log_to_file(&format!("IME: Final Raw Text: '{}'", final_text));
-            
+
             if !final_text.is_empty() {
-                // Apply professional Inverse Text Normalization (ITN)
                 let formatted_text = crate::itn::format_text(&final_text);
-                crate::log_to_file(&format!("IME: ITN Text: '{}'", formatted_text));
-                
+
                 if let Ok(jtext) = env.new_string(&formatted_text) {
                     let _ = env.call_method(
                         service_obj,
@@ -276,9 +260,8 @@ pub unsafe extern "system" fn Java_com_catfewd_nemotron_RustInputMethodService_s
                 buffer_for_capture.lock().unwrap().extend_from_slice(data);
             },
             |e| {
-                let msg = format!("IME Stream Error: {}", e);
-                log::error!("{}", msg);
-                crate::log_to_file(&msg);
+                // Silently ignore stream errors
+                let _ = e;
             },
             None,
         );
@@ -286,13 +269,8 @@ pub unsafe extern "system" fn Java_com_catfewd_nemotron_RustInputMethodService_s
         if let Ok(s) = stream {
             s.play().ok();
             state.stream = Some(SendStream(s));
-            crate::log_to_file("IME: Audio stream started successfully");
             notify_status(&mut env, state.service_ref.as_obj(), "Listening...");
-        } else {
-            crate::log_to_file("IME Error: Failed to build input stream");
         }
-    } else {
-        crate::log_to_file("IME Error: Failed to lock IME_STATE in startRecording");
     }
 }
 
@@ -301,13 +279,11 @@ pub unsafe extern "system" fn Java_com_catfewd_nemotron_RustInputMethodService_s
     mut env: JNIEnv,
     _class: JClass,
 ) {
-    crate::log_to_file("IME: stopRecording called");
     let (_jvm, service_ref, _is_streaming) = {
         let mut state_guard = IME_STATE.lock().unwrap();
         if let Some(state) = state_guard.as_mut() {
             state.stream = None;
             state.is_streaming.store(false, std::sync::atomic::Ordering::Release);
-            crate::log_to_file("IME: is_streaming set to FALSE");
             (
                 state.jvm.clone(),
                 state.service_ref.clone(),

@@ -111,7 +111,7 @@ jobs:
           -keyalg RSA -keysize 2048 -validity 10000 \
           -dname "CN=Android Debug, OU=Unknown, O=Unknown, C=US"
 
-        $BUILD_TOOLS/zipalign -f -p -v 4 \
+        $BUILD_TOOLS/zipalign -f -p -v 16 \
           build_manual/apk/unaligned.apk build_manual/apk/aligned.apk
         $BUILD_TOOLS/apksigner sign \
           --ks $HOME/.android/debug.keystore \

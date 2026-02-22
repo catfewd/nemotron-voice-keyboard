@@ -41,7 +41,15 @@ jobs:
         echo "$TOOLCHAIN_BIN" >> $GITHUB_PATH
         $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-33" "build-tools;34.0.0"
 
+    - name: Cache Nemotron Model
+      uses: actions/cache@v4
+      id: model-cache
+      with:
+        path: assets/nemotron-model
+        key: nemotron-model-v1
+
     - name: Download Nemotron Model
+      if: steps.model-cache.outputs.cache-hit != 'true'
       run: |
         mkdir -p assets/nemotron-model
         cd assets/nemotron-model
@@ -66,6 +74,16 @@ jobs:
         ]
         EOF
 
+    - name: Cache Rust dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: rust-${{ hashFiles('Cargo.lock') }}
+        restore-keys: rust-
+
     - name: Patch ort-sys build script
       run: |
         cargo fetch --target aarch64-linux-android 2>/dev/null || true
@@ -76,6 +94,7 @@ jobs:
         export ORT_STRATEGY=system
         export ORT_LIB_LOCATION=$GITHUB_WORKSPACE/jniLibs/arm64-v8a
         export ORT_SKIP_DOWNLOAD=1
+        export ORT_LIB_EXTENSION=so
         cargo build --target aarch64-linux-android --release
         cp target/aarch64-linux-android/release/libandroid_transcribe_app.so jniLibs/arm64-v8a/
 

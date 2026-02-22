@@ -130,15 +130,13 @@ public class RustInputMethodService extends InputMethodService {
         // Force dark colors
         int bgColor = 0xFF000000;
         int cardColor = 0xFF1E1E1E;
-        int keyColor = 0xFF333333; // Dark gray
         int textColor = 0xFFE0E0E0;
-        int subTextColor = 0xFFB0B0B0;
-        int iconColor = 0xFFFFFFFF; // Pure white for icons
+        int iconColor = 0xFFFFFFFF;
 
         root.setBackgroundColor(bgColor);
         statusView.setTextColor(textColor);
         previewView.setTextColor(textColor);
-        hintView.setTextColor(iconColor); // Make hint white in dark mode
+        hintView.setTextColor(iconColor);
         
         recordContainer.setBackgroundTintList(android.content.res.ColorStateList.valueOf(cardColor));
     }
@@ -169,21 +167,20 @@ public class RustInputMethodService extends InputMethodService {
     private void updateRecordButtonUI(boolean recording) {
         isRecording = recording;
         if (recording) {
-            micIcon.setColorFilter(0xFFF44336); // Red
+            micIcon.setColorFilter(0xFFF44336);
             micIcon.setVisibility(View.GONE);
             hintView.setVisibility(View.GONE);
             previewScroll.setVisibility(View.VISIBLE);
             previewView.setText("");
             statusView.setText("Recording... Tap Anywhere to Send");
-            statusView.setTextColor(0xFFF44336); // Red
+            statusView.setTextColor(0xFFF44336);
         } else {
-            micIcon.setColorFilter(0xFF2196F3); // Blue
+            micIcon.setColorFilter(0xFF2196F3);
             micIcon.setVisibility(View.VISIBLE);
             hintView.setVisibility(View.VISIBLE);
             previewScroll.setVisibility(View.GONE);
             statusView.setText("Ready");
             
-            // Resolve text color from theme if not forced dark
             android.content.SharedPreferences prefs = getSharedPreferences("settings", Context.MODE_PRIVATE);
             if (prefs.getBoolean("dark_mode", false)) {
                 statusView.setTextColor(0xFFE0E0E0);
@@ -214,7 +211,6 @@ public class RustInputMethodService extends InputMethodService {
             
             if ("Ready".equals(status)) {
                 isEngineReady = true;
-                // Check if we were waiting to auto-start
                 if (autoStartPending) {
                     autoStartPending = false;
                     if (!isRecording) {
@@ -248,19 +244,16 @@ public class RustInputMethodService extends InputMethodService {
         boolean isTranscribing = lastStatus.contains("Transcribing") || lastStatus.contains("Processing");
         boolean isError = lastStatus.startsWith("Error");
 
-        // Show progress bar during loading or waiting for model
         if (progressBar != null) {
             progressBar.setVisibility(isLoading || isWaiting ? View.VISIBLE : View.GONE);
         }
 
-        // Disable button only during transcription/processing/waiting or fatal errors
         if (recordContainer != null) {
             boolean disable = isTranscribing || isWaiting || isError;
             recordContainer.setEnabled(!disable);
             recordContainer.setAlpha(disable ? 0.5f : 1.0f);
         }
 
-        // Update hint during loading to indicate recording is available
         if (isLoading && hintView != null && !isRecording) {
             hintView.setText("Tap to Record (model loading)");
         }

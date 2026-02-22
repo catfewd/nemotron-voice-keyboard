@@ -1,0 +1,237 @@
+# Nemotron Voice Keyboard - Build Notes
+
+## Project Overview
+This is an Android IME (keyboard) app that uses NVIDIA's Nemotron ASR model via ONNX Runtime for on-device speech recognition. It is written in Rust (JNI) + Java, built without Android Studio or Gradle.
+
+---
+
+## Critical Architecture Facts
+
+### The Native Library Situation
+The core of the app is `libandroid_transcribe_app.so` — a Rust library compiled for `aarch64-linux-android`. This library:
+- Links against `libonnxruntime.so` for ONNX inference
+- Must be compiled with **statically linked C++** (`-static-libstdc++`) to work on Android
+- If compiled with dynamic C++ linking, it will crash at launch with `libc++_shared.so not found`
+- The working prebuilt binary lives in `jniLibs/arm64-v8a/libandroid_transcribe_app.so`
+
+### The libc++_shared.so Situation (IMPORTANT — READ THIS)
+`libonnxruntime.so` has a dynamic dependency on `libc++_shared.so` at runtime. This means even
+though `libandroid_transcribe_app.so` is statically linked, the process still needs
+`libc++_shared.so` to be present for `libonnxruntime.so` to load.
+
+When the main app launches normally, Android's linker namespace resolves this fine.
+When the IME service is cold-started by Android in isolation (e.g. after the process
+was killed due to battery optimization), the linker namespace is more restricted and
+`libc++_shared.so` cannot be found — causing a crash loop.
+
+**The fix: `libc++_shared.so` is now bundled in `jniLibs/arm64-v8a/` and packaged into the APK.**
+
+#### About the version
+Google ships `libc++_shared.so` built by NDK r27-beta1 inside the NDK r28 package.
+This is not a mistake on our end — that is literally what's in the r28 zip.
+The r27-beta1 copy works correctly with our `libonnxruntime.so`. Do not waste time
+trying to find an "r28 version" — it does not exist as a separate file. The one in
+`jniLibs/arm64-v8a/libc++_shared.so` is the correct one to use.
+
+**Do not remove `libc++_shared.so` from `jniLibs/arm64-v8a/`.** Without it the IME
+will crash every time Android cold-starts the service process.
+
+### 16KB Page Alignment
+Android 16 requires `.so` files to be compiled with 16KB page alignment. The build
+system adds this linker flag to the Rust compile:
+```
+-Wl,-z,max-page-size=16384
+```
+This is already in `build.sh` rustflags. Do not remove it.
+
+### Two Completely Separate Build Systems
+There are two ways to build this project and they are NOT interchangeable:
+
+1. **Local phone build** (`build.sh`) — runs on the Android device itself inside Termux
+2. **GitHub Actions build** (`.github/workflows/android_release.yml`) — runs on Ubuntu x86_64
+
+**Never call `build.sh` from the Actions workflow.** They must remain independent.
+
+---
+
+## Device Setup (One Time)
+
+### Unrestricted Battery
+Go to Settings → Apps → Nemotron → Battery → set to Unrestricted.
+Without this, Android will kill the app process during idle and the IME will
+cold-start crash until the main app is opened again. This is a user-side setting
+and cannot be set programmatically.
+
+---
+
+## Local Build (Termux on Android)
+
+### Why it's complicated
+The NDK toolchain prebuilt binaries are x86_64 Linux binaries. They physically cannot
+execute on an ARM64 Android device. So we cannot use the NDK's clang as the linker —
+we use Termux's native clang instead.
+
+### How it works
+- Linker: Termux's own `/data/data/com.termux/files/usr/bin/clang`
+- The NDK sysroot is passed via `--sysroot` flag so it links against Android libraries
+- C++ runtime: `-static-libstdc++` flag tells Termux clang to statically link C++
+- Config is generated fresh each run via `.cargo/config.toml`
+
+### The ort-sys problem (local)
+`ort-sys v2.0.0-rc.11` has a bug where its build script panics trying to find a system
+cache directory, which doesn't work in Termux's sudo environment. The fix is a one-time
+manual patch to the registry source:
+
+```
+~/.cargo/registry/src/index.crates.io-*/ort-sys-2.0.0-rc.11/build/main.rs
+```
+
+Line containing `internal::dirs::cache_dir()` is replaced with a hardcoded path:
+```rust
+let bin_extract_dir = std::path::PathBuf::from("/data/data/com.termux/files/home/transcribe_v2/.cache/ort")
+```
+
+This patch must be reapplied if the cargo registry cache is cleared.
+
+### The oboe-sys problem (local)
+`oboe-sys` hardcodes `-lc++_static` in its build script, which doesn't exist in Termux.
+Fix applied to registry source:
+```
+~/.cargo/registry/src/index.crates.io-*/oboe-sys-*/
+```
+All instances of `c++_static` replaced with `c++_shared`.
+
+### Key environment variables for local build
+```bash
+ORT_STRATEGY=system
+ORT_LIB_LOCATION=$(pwd)/jniLibs/arm64-v8a
+ORT_SKIP_DOWNLOAD=1
+XDG_CACHE_HOME=$(pwd)/.cache
+HOME=/data/data/com.termux/files/home
+```
+
+### Skip recompile when possible
+`build.sh` checks if the `.so` is newer than source files before recompiling. When only
+Java/resources change, it skips the Rust compile entirely. This avoids hitting the
+ort-sys issues on every build.
+
+To force a full recompile (e.g. after changing rustflags):
+```bash
+rm target/aarch64-linux-android/release/libandroid_transcribe_app.so
+./build.sh
+```
+
+### "Text file busy" error during recompile
+If you get `Text file busy (os error 26)` during a forced recompile, a process is still
+holding the old binary open. Exit Termux completely, reopen it, and run `build.sh` again.
+
+---
+
+## GitHub Actions Build
+
+### How it works
+- Runs on Ubuntu x86_64 — the NDK clang works natively here
+- Uses NDK r28's proper `aarch64-linux-android26-clang` as the linker
+- C++ runtime: `-static-libstdc++` (same flag, different library — NDK has `libc++_static.a`)
+- `patch_ort_sys.py` applies the same cache_dir fix at build time since the registry
+  source won't be pre-patched
+
+### Critical: prebuilt .so
+**The Actions workflow does NOT recompile the Rust code.** It uses the prebuilt
+`libandroid_transcribe_app.so` from `jniLibs/arm64-v8a/` in the repo. This is
+intentional because:
+- The working binary was compiled with correct static C++ linking
+- Recompiling on Actions produced a binary with dynamic C++ linking that crashed
+- Until the Actions Rust compile is verified to produce a statically linked binary,
+  use the prebuilt
+
+### What triggers a release
+- Pushing a version tag: `git tag v0.1.X && git push origin v0.1.X`
+- A plain push to `main` runs the build but does NOT create a release or attach an APK
+
+### The ort-sys problem (Actions)
+Same underlying issue as local. `patch_ort_sys.py` runs before the Rust compile and
+patches the registry source dynamically. It searches for the `cache_dir()` line by
+content rather than line number since line numbers differ between environments.
+
+---
+
+## File Structure
+
+```
+jniLibs/arm64-v8a/
+  libandroid_transcribe_app.so  ← THE WORKING PREBUILT. DO NOT DELETE.
+  libonnxruntime.so             ← ONNX Runtime for Android arm64
+  libc++_shared.so              ← Required at runtime for libonnxruntime.so. DO NOT DELETE.
+                                   This is NDK r27-beta1 and that is correct — r28 ships
+                                   the same file. Do not replace it.
+
+assets/nemotron-model/          ← Downloaded during Actions build, not committed
+  encoder.onnx
+  decoder_joint.onnx
+  tokenizer.model
+
+.cargo/config.toml              ← Generated by build.sh, Termux-specific linker config
+patch_ort_sys.py                ← Applied by Actions to fix ort-sys cache_dir panic
+build.sh                        ← LOCAL ONLY. Never call from Actions.
+.github/workflows/android_release.yml  ← ACTIONS ONLY. Never call build.sh.
+```
+
+---
+
+## What NOT to do
+
+- **Do not** remove `libc++_shared.so` from `jniLibs/arm64-v8a/` — the IME will crash
+  on cold start without it
+- **Do not** try to replace `libc++_shared.so` with an "r28 version" — r28 ships the
+  same r27-beta1 file, this is not a mistake
+- **Do not** run `cargo clean` unless you want to spend an hour fixing ort-sys and
+  oboe-sys patches again
+- **Do not** update `ort` to a version newer than `2.0.0-rc.11` without testing — the
+  build script behavior may change
+- **Do not** add `download-binaries` as a feature to the `ort` dependency in `Cargo.toml`
+- **Do not** let Actions recompile the Rust until the static linking issue is properly
+  resolved on that platform
+- **Do not** change the package name without also updating Rust JNI function names —
+  they must match exactly
+- **Do not** remove the `-Wl,-z,max-page-size=16384` rustflag — required for Android 16
+
+---
+
+## If the App Crashes on Launch
+
+### `libc++_shared.so not found`
+`libc++_shared.so` is missing from `jniLibs/arm64-v8a/` or was not packaged into the
+APK. Verify it's in `jniLibs/arm64-v8a/` and that `build.sh` copied it into the APK.
+Check with:
+```bash
+unzip -l Nemotron_Voice_Keyboard.apk | grep "\.so"
+```
+You should see all three `.so` files listed.
+
+### IME keyboard hangs or crashes after sitting idle
+This is the cold-start linker namespace problem. Make sure:
+1. `libc++_shared.so` is in the APK (see above)
+2. Battery optimization is set to Unrestricted for the app in device Settings
+
+### `__cxa_pure_virtual not found`
+Wrong `libc++_shared.so` version bundled, or binary needs static linking.
+
+### `No implementation found for Java_com_...`
+JNI function names in Rust don't match the Java package name. Either revert the package
+name change or recompile Rust with updated function names.
+
+### `Text file busy` during build
+Exit Termux fully, reopen, run `build.sh` again.
+
+---
+
+## Version History
+- `0.1.13` — Last version before build system overhaul
+- `0.1.14` — Fixed Termux build system, static C++ linking, prebuilt .so in repo
+- `0.1.15` — Actions workflow fixed to use prebuilt .so
+- `0.1.19` — Bundled `libc++_shared.so` in APK to fix IME cold-start crash;
+             added 16KB page alignment flag for Android 16 compatibility;
+             enabled unrestricted battery as required device setup step
+
+Catfewd

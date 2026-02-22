@@ -48,7 +48,8 @@ rustflags = [
     "-C", "link-arg=-L$ORT_LIBS",
     "-C", "link-arg=-lonnxruntime",
     "-C", "link-arg=-llog",
-    "-C", "link-arg=-lc++_shared"
+    "-C", "link-arg=-lc++_shared",
+    "-C", "link-arg=-Wl,-z,max-page-size=16384"
 ]
 EOF
 
@@ -83,6 +84,10 @@ $D8 --output build_manual/apk --lib "$PLATFORM" @build_manual/classes.txt
 echo "--- Packaging APK ---"
 cp jniLibs/arm64-v8a/libandroid_transcribe_app.so build_manual/lib/arm64-v8a/
 cp jniLibs/arm64-v8a/libonnxruntime.so build_manual/lib/arm64-v8a/
+# Copy libc++_shared.so if present — needed when libonnxruntime.so has a dynamic dependency on it
+[ -f jniLibs/arm64-v8a/libc++_shared.so ] && \
+    cp jniLibs/arm64-v8a/libc++_shared.so build_manual/lib/arm64-v8a/ || \
+    echo "--- WARNING: libc++_shared.so not found in jniLibs/arm64-v8a, skipping ---"
 find .cache/ort -name "*.so" -exec cp {} build_manual/lib/arm64-v8a/ \; 2>/dev/null || true
 
 cd build_manual/apk
@@ -96,7 +101,7 @@ fi
 cd ../..
 
 echo "--- Aligning and Signing APK ---"
-$ZIPALIGN -f -p -v 4 build_manual/apk/unaligned.apk build_manual/apk/aligned.apk
+$ZIPALIGN -f -p -v 16 build_manual/apk/unaligned.apk build_manual/apk/aligned.apk
 $APKSIGNER sign --ks "$KEYSTORE" --ks-pass "pass:$STORE_PASS" \
     --key-pass "pass:$KEY_PASS" --ks-key-alias "$KEY_ALIAS" \
     --out Nemotron_Voice_Keyboard.apk build_manual/apk/aligned.apk

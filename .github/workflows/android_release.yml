@@ -30,16 +30,27 @@ jobs:
       with:
         targets: aarch64-linux-android
 
+    - name: Cache Android NDK
+      uses: actions/cache@v4
+      id: ndk-cache
+      with:
+        path: ${{ env.ANDROID_HOME }}/android-ndk-r28
+        key: android-ndk-r28
+
     - name: Install Android NDK r28
+      if: steps.ndk-cache.outputs.cache-hit != 'true'
       run: |
         cd $ANDROID_HOME
         curl -L -O https://dl.google.com/android/repository/android-ndk-r28-linux.zip
         unzip -q android-ndk-r28-linux.zip
         rm android-ndk-r28-linux.zip
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-33" "build-tools;34.0.0"
+
+    - name: Setup NDK environment
+      run: |
         echo "ANDROID_NDK_HOME=$ANDROID_HOME/android-ndk-r28" >> $GITHUB_ENV
         TOOLCHAIN_BIN=$ANDROID_HOME/android-ndk-r28/toolchains/llvm/prebuilt/linux-x86_64/bin
         echo "$TOOLCHAIN_BIN" >> $GITHUB_PATH
-        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-33" "build-tools;34.0.0"
 
     - name: Cache Nemotron Model
       uses: actions/cache@v4
@@ -95,6 +106,7 @@ jobs:
         export ORT_LIB_LOCATION=$GITHUB_WORKSPACE/jniLibs/arm64-v8a
         export ORT_SKIP_DOWNLOAD=1
         export ORT_LIB_EXTENSION=so
+        rm -f jniLibs/arm64-v8a/libonnxruntime.a
         cargo build --target aarch64-linux-android --release
         cp target/aarch64-linux-android/release/libandroid_transcribe_app.so jniLibs/arm64-v8a/
 

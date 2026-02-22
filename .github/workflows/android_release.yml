@@ -39,8 +39,7 @@ jobs:
         echo "ANDROID_NDK_HOME=$ANDROID_HOME/android-ndk-r28" >> $GITHUB_ENV
         TOOLCHAIN_BIN=$ANDROID_HOME/android-ndk-r28/toolchains/llvm/prebuilt/linux-x86_64/bin
         echo "$TOOLCHAIN_BIN" >> $GITHUB_PATH
-        # Install required Android platform
-        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-33" "build-tools;34.0.0" 
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-33" "build-tools;34.0.0"
 
     - name: Download Nemotron Model
       run: |
@@ -97,6 +96,9 @@ jobs:
 
         cp jniLibs/arm64-v8a/libandroid_transcribe_app.so build_manual/lib/arm64-v8a/
         cp jniLibs/arm64-v8a/libonnxruntime.so build_manual/lib/arm64-v8a/
+        [ -f jniLibs/arm64-v8a/libc++_shared.so ] && \
+          cp jniLibs/arm64-v8a/libc++_shared.so build_manual/lib/arm64-v8a/ || \
+          echo "WARNING: libc++_shared.so not found in jniLibs/arm64-v8a"
 
         cd build_manual/apk
         zip -g unaligned.apk classes.dex
@@ -123,5 +125,5 @@ jobs:
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
       with:
-        name: Nemotron Voice Keyboard v0.1.14
+        name: Nemotron Voice Keyboard ${{ github.ref_name }}
         files: Nemotron_Voice_Keyboard.apk
